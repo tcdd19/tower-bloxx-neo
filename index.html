@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>摩天大楼：重塑版 (Tower Bloxx Neo)</title>
+  <meta name="description" content="经典诺基亚盖楼游戏《摩天大楼》的现代 HTML5 重置版，完美支持物理摆动与手机震动反馈。">
+  <link rel="stylesheet" href="style.css">
+  <!-- 引入 Google Fonts 提升排版档次 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- 游戏主容器 -->
+  <div id="app-container">
+    <!-- 背景流星/星光层 (纯 CSS 增强视觉) -->
+    <div class="sky-background"></div>
+    <div class="stars"></div>
+    
+    <!-- 游戏核心区域 -->
+    <div id="game-wrapper">
+      <!-- 游戏 Canvas -->
+      <canvas id="game-canvas"></canvas>
+      
+      <!-- 头部 HUD (信息指示栏) -->
+      <div id="hud-overlay" class="hud-container hidden">
+        <div class="hud-item score-box">
+          <span class="hud-label">得分</span>
+          <span id="score-val" class="hud-value font-mono">0</span>
+        </div>
+        <div class="hud-item height-box">
+          <span class="hud-label">楼层</span>
+          <span id="height-val" class="hud-value font-mono">0</span>
+        </div>
+        <div class="hud-item combo-box">
+          <span id="combo-text" class="hud-label font-mono">COMBO</span>
+          <span id="combo-val" class="hud-value font-mono">x0</span>
+        </div>
+        <div class="hud-item lives-box">
+          <span class="hud-label">生命</span>
+          <div id="hearts-container">
+            <span class="heart active">♥</span>
+            <span class="heart active">♥</span>
+            <span class="heart active">♥</span>
+          </div>
+        </div>
+        <div class="hud-item pop-box">
+          <span class="hud-label">居民</span>
+          <span id="population-val" class="hud-value font-mono">0</span>
+        </div>
+      </div>
+
+      <!-- 提示轻触屏幕的遮罩层 (在游戏中显示，提示移动端用户) -->
+      <div id="tap-instruction" class="tap-hint-overlay hidden">
+        <span>点击屏幕 / 空格 / 回车 释放楼层 | Esc 暂停</span>
+      </div>
+
+      <!-- 开始菜单弹窗 -->
+      <div id="start-menu" class="menu-overlay">
+        <h1 class="game-title">
+          TOWER BLOXX<br><span class="neon-text">NEO</span>
+        </h1>
+        <p class="game-subtitle">重温经典，指尖盖楼</p>
+        
+        <div class="button-group">
+          <button id="btn-start-game" class="btn btn-primary" onclick="window.gameInstance && window.gameInstance.startGame()">开始游戏</button>
+          <button id="btn-open-settings" class="btn btn-secondary">游戏设置</button>
+        </div>
+        
+        <div class="high-score-board">
+          <span>历史最高纪录: </span>
+          <span id="high-score-val" class="font-mono">0</span>
+        </div>
+      </div>
+
+      <!-- 设置菜单弹窗 -->
+      <div id="settings-menu" class="menu-overlay hidden">
+        <h2 class="menu-title">游戏设置</h2>
+        
+        <div class="setting-list">
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">声音效果</span>
+              <span class="setting-desc">使用 Web Audio 实时合成的复古音效</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggle-sound" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">手机震动</span>
+              <span class="setting-desc">落地/完美/失败时的触觉反馈</span>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="toggle-vibrate" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+
+          <div class="setting-item">
+            <div class="setting-info">
+              <span class="setting-name">视觉主题</span>
+              <span class="setting-desc">赛博霓虹灯 vs 诺基亚复古绿</span>
+            </div>
+            <div class="theme-selector">
+              <button id="btn-theme-modern" class="theme-btn active">霓虹</button>
+              <button id="btn-theme-retro" class="theme-btn">复古</button>
+            </div>
+          </div>
+        </div>
+
+        <button id="btn-close-settings" class="btn btn-secondary">返回主菜单</button>
+      </div>
+
+      <!-- 游戏结束弹窗 -->
+      <div id="game-over-screen" class="menu-overlay hidden">
+        <h2 class="menu-title text-danger">游戏结束</h2>
+        <p class="game-over-reason" id="game-over-reason-text">楼房倾斜坍塌了！</p>
+        
+        <div class="results-board">
+          <div class="result-row">
+            <span>最终得分</span>
+            <span id="final-score-val" class="result-value font-mono">0</span>
+          </div>
+          <div class="result-row">
+            <span>大楼高度</span>
+            <span id="final-height-val" class="result-value font-mono">0 层</span>
+          </div>
+          <div class="result-row">
+            <span>最高连击</span>
+            <span id="max-combo-val" class="result-value font-mono">0</span>
+          </div>
+        </div>
+
+        <div class="button-group">
+          <button id="btn-restart-game" class="btn btn-primary">再来一局</button>
+          <button id="btn-return-home" class="btn btn-secondary">主菜单</button>
+        </div>
+      </div>
+
+      <!-- 暂停菜单弹窗 -->
+      <div id="pause-menu" class="menu-overlay hidden">
+        <h2 class="menu-title">游戏暂停</h2>
+        <p class="game-subtitle">按 Esc 或 P 键继续</p>
+        <div class="button-group">
+          <button id="btn-resume-game" class="btn btn-primary">继续游戏</button>
+          <button id="btn-pause-home" class="btn btn-secondary">返回主菜单</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <script src="game.js"></script>
+</body>
+</html>
