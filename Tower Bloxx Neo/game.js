@@ -997,7 +997,8 @@ class TowerBloxxGame {
     this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
     this.ctx.save();
-    this.ctx.scale(this.dpr, this.dpr);
+    const responsiveScale = this.dpr * (this.scaleFactor || 1);
+    this.ctx.scale(responsiveScale, responsiveScale);
 
     // E3: 应用屏幕震动偏移
     if (this.screenShake.duration > 0) {
@@ -1493,18 +1494,18 @@ class TowerBloxxGame {
   // 画布缩放自适应尺寸计算
   resizeCanvas() {
     const parent = this.canvas.parentElement;
-    let parentWidth = parent.clientWidth;
-    let parentHeight = parent.clientHeight;
+    let parentWidth = parent ? parent.clientWidth : 0;
+    let parentHeight = parent ? parent.clientHeight : 0;
 
     // 如果因为样式文件未完成加载，导致获取的 clientWidth 或 clientHeight 为 0
     if (parentWidth === 0 || parentHeight === 0) {
-      // 采用 window 视口宽度和高度作为兜底以保证初次渲染正常，限制最大宽度
       parentWidth = Math.min(window.innerWidth, 480);
       parentHeight = Math.min(window.innerHeight, 850);
-      
-      // 延时 500ms 重新自适应一次，以在 CSS 加载完后纠正布局
       setTimeout(() => this.resizeCanvas(), 500);
     }
+
+    // 计算逻辑 480 宽度到实际设备容器屏幕宽度的自适应比例 Factor
+    this.scaleFactor = parentWidth / this.baseWidth;
 
     this.canvas.width = parentWidth * this.dpr;
     this.canvas.height = parentHeight * this.dpr;
