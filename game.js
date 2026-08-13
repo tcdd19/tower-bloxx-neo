@@ -698,7 +698,7 @@ class TowerBloxxGame {
     this.canvas = document.getElementById('game-canvas');
     this.ctx = this.canvas.getContext('2d');
     
-    this.assetsLoaded = false;
+    this.assetsLoaded = true;
     this.loader = new AssetLoader();
     this.spriteEffects = [];
     this.jetX = -100;
@@ -3227,9 +3227,12 @@ class TowerBloxxGame {
 function initGameEngine() {
   if (!window.gameInstance) {
     window.gameInstance = new TowerBloxxGame();
-    window.gameInstance.loader.loadAll(() => {
-      window.gameInstance.assetsLoaded = true;
-    });
+    window.gameInstance.assetsLoaded = true;
+    if (window.gameInstance.loader) {
+      window.gameInstance.loader.loadAll(() => {
+        window.gameInstance.assetsLoaded = true;
+      });
+    }
   }
 }
 
