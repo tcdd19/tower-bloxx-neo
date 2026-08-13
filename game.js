@@ -1502,8 +1502,8 @@ class TowerBloxxGame {
       this.drawScandinavianBlock(drawX, drawY, block.w, block.h, isRetro, idx, blockAngle);
     });
 
-    // E1: 给最高层画封顶 2.5D 豪华屋顶盖 (Roof Cap)
-    if (this.tower.length > 0) {
+    // E1: 仅在游戏结束 (GAMEOVER) 楼房封顶时，给最高层画封顶屋顶盖 (Roof Cap)
+    if (this.state === 'GAMEOVER' && this.tower.length > 0) {
       const topIdx = this.tower.length - 1;
       const topBlock = this.tower[topIdx];
       const topSway = this.towerSway.offset * Math.pow((topIdx + 1) / this.tower.length, 1.5);
