@@ -1093,6 +1093,9 @@ class TowerBloxxGame {
     // 1. 渐进式背景 (Sunset Park -> Day Sky -> Stratosphere -> Outer Space)
     this.drawBackground();
 
+    // 1.5 诺基亚原版高楼背景剪影 (Vertical Skyscraper Silhouettes)
+    this.drawSkyscraperSilhouettes();
+
     // 2. 渲染云朵与星星 (带摄像机视差)
     this.drawParallaxStarsAndClouds();
 
@@ -1117,8 +1120,32 @@ class TowerBloxxGame {
     this.ctx.restore();
   }
 
-  // 绘制渐进式背景
-  drawBackground() {
+  // 绘制诺基亚原版背景高楼剪影
+  drawSkyscraperSilhouettes() {
+    if (this.theme === 'retro') return;
+    this.ctx.save();
+    this.ctx.globalAlpha = 0.16;
+    this.ctx.fillStyle = '#ffffff';
+
+    const buildings = [
+      { x: 15, w: 50, h: 700 },
+      { x: 80, w: 42, h: 760 },
+      { x: 135, w: 65, h: 620 },
+      { x: 215, w: 48, h: 840 },
+      { x: 280, w: 60, h: 680 },
+      { x: 355, w: 45, h: 790 },
+      { x: 415, w: 50, h: 650 }
+    ];
+
+    buildings.forEach(b => {
+      const drawY = this.baseHeight - b.h + this.camera.y * 0.15;
+      this.ctx.fillRect(b.x, drawY, b.w, b.h);
+      this.ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+      this.ctx.lineWidth = 1;
+      this.ctx.strokeRect(b.x, drawY, b.w, b.h);
+    });
+    this.ctx.restore();
+  }
     const isRetro = this.theme === 'retro';
     if (isRetro) {
       this.ctx.fillStyle = '#9bbc0f';
@@ -1394,7 +1421,7 @@ class TowerBloxxGame {
     this.ctx.restore();
   }
 
-  // 绘制经典的北欧简直风格方形建筑单元
+  // 绘制诺基亚原版经典风格建筑单元 (Cyan Teal Body, Yellow Roof, Twin Windows)
   drawScandinavianBlock(x, y, w, h, isRetro, idx) {
     this.ctx.save();
 
@@ -1406,62 +1433,54 @@ class TowerBloxxGame {
       this.ctx.fillRect(x - w / 2, y, w, h);
       this.ctx.strokeRect(x - w / 2, y, w, h);
 
-      // B2: 窗户随楼宽缩放（复古主题）
-      const retroWinW = Math.max(10, Math.floor(w * 0.22));
-      const retroWinH = Math.max(14, Math.floor(h * 0.45));
+      // 复古双窗
+      const retroWinW = Math.max(8, Math.floor(w * 0.2));
+      const retroWinH = Math.max(12, Math.floor(h * 0.42));
       this.ctx.fillStyle = '#0f380f';
-      this.ctx.fillRect(x - retroWinW / 2, y + (h - retroWinH) / 2, retroWinW, retroWinH);
-      
-      // 窗格浅色格子线
-      this.ctx.strokeStyle = '#8bac0f';
-      this.ctx.lineWidth = 1.5;
-      this.ctx.beginPath();
-      this.ctx.moveTo(x, y + 15);
-      this.ctx.lineTo(x, y + 39);
-      this.ctx.moveTo(x - 9, y + 27);
-      this.ctx.lineTo(x + 9, y + 27);
-      this.ctx.stroke();
+      this.ctx.fillRect(x - retroWinW - 3, y + (h - retroWinH) / 2, retroWinW, retroWinH);
+      this.ctx.fillRect(x + 3, y + (h - retroWinH) / 2, retroWinW, retroWinH);
       this.ctx.restore();
       return;
     }
 
-    // --- 现代北欧经典风格建筑设计 (黄墙，白框，蓝窗，红顶) ---
-    // 1. 黄色质感外墙 (带细微层次与描边)
-    const baseColor = '#eccc68'; // 经典北欧奶油金黄色
-    const shadowColor = '#d3b047';
-    
-    this.ctx.shadowBlur = idx === 999 ? 12 : 3; // 处于下落状态则高亮发光
-    this.ctx.shadowColor = idx === 999 ? '#ffd166' : 'rgba(0,0,0,0.1)';
+    // --- 诺基亚原版标志性湖蓝青绿建筑配色 (经典 1:1 还原) ---
+    const baseColor = '#00b4d8';   // 诺基亚原版湖青蓝
+    const shadowColor = '#0077b6'; // 侧边深蓝阴影
+    const roofColor = '#ffc300';   // 黄色顶饰条
+
+    this.ctx.shadowBlur = idx === 999 ? 12 : 3;
+    this.ctx.shadowColor = idx === 999 ? '#00f0ff' : 'rgba(0,0,0,0.15)';
 
     this.ctx.fillStyle = baseColor;
-    this.ctx.strokeStyle = '#2c3e50';
+    this.ctx.strokeStyle = '#03045e';
     this.ctx.lineWidth = 2.5;
 
-    // 画主外墙矩形 (四角微圆，带欧式质感)
-    this.drawRoundedRect(x - w / 2, y, w, h, 4);
+    // 画主外墙矩形
+    this.drawRoundedRect(x - w / 2, y, w, h, 3);
     this.ctx.fill();
     this.ctx.stroke();
 
-    // 2. 绘制侧边阴影，使房子更有立体感 (左侧亮，右侧暗)
+    // 2. 侧边阴影
     this.ctx.shadowBlur = 0;
     this.ctx.fillStyle = shadowColor;
     this.ctx.fillRect(x + w / 2 - 8, y + 1, 7, h - 2);
 
-    // 3. 北欧红砖瓦斜房檐 (屋顶装饰线)
-    // 在每个单元顶端加 6 像素高的红瓦装饰线
-    this.ctx.fillStyle = '#ff6b6b'; // 北欧深红色房顶
-    this.ctx.strokeStyle = '#2c3e50';
+    // 3. 诺基亚标志性黄色房檐/屋顶饰条
+    this.ctx.fillStyle = roofColor;
+    this.ctx.strokeStyle = '#03045e';
     this.ctx.lineWidth = 2;
     this.ctx.fillRect(x - w / 2 - 2, y - 2, w + 4, 6);
     this.ctx.strokeRect(x - w / 2 - 2, y - 2, w + 4, 6);
 
-    // B2: 窗户随楼宽动态缩放
-    const windowW = Math.max(12, Math.floor(w * 0.25));
-    const windowH = Math.max(16, Math.floor(h * 0.5));
-    const wx = x - windowW / 2;
+    // 4. 双排亮绿/海蓝双窗户 (1:1 匹配诺基亚原版双窗格 layout)
+    const windowW = Math.max(10, Math.floor(w * 0.22));
+    const windowH = Math.max(14, Math.floor(h * 0.48));
     const wy = y + (h - windowH) / 2 + 1;
 
-    this.drawSingleWindow(wx, wy, windowW, windowH, idx);
+    // 左窗户
+    this.drawSingleWindow(x - windowW - 3, wy, windowW, windowH, idx);
+    // 右窗户
+    this.drawSingleWindow(x + 3, wy, windowW, windowH, idx + 1);
 
     this.ctx.restore();
   }
@@ -1493,12 +1512,12 @@ class TowerBloxxGame {
     this.ctx.stroke();
   }
 
-  // 绘制顶部吊架、动态滑快与机械吊爪系统
+  // 绘制诺基亚原版吊架与高悬钢索
   drawCrane() {
     const isRetro = this.theme === 'retro';
     
-    // 顶部导轨滑块跟摆 (Trolley offset)
-    const trolleyX = this.baseWidth / 2 + Math.sin(this.crane.angle) * 16;
+    // 诺基亚原版悬挂轴心
+    const trolleyX = this.baseWidth / 2 + Math.sin(this.crane.angle) * 22;
     const currentRopeLen = this.crane.length + this.crane.ropeStretch;
     
     // 绳爪连接顶端的世界 X, Y
@@ -1507,106 +1526,49 @@ class TowerBloxxGame {
 
     this.ctx.save();
 
-    // 1. 顶部金属导轨架
-    this.ctx.strokeStyle = isRetro ? '#0f380f' : '#2c3e50';
-    this.ctx.lineWidth = isRetro ? 5 : 6;
+    // 1. 诺基亚原版高悬深色吊绳 (从屏幕顶部外延伸向下)
+    this.ctx.strokeStyle = isRetro ? '#0f380f' : '#1e293b';
+    this.ctx.lineWidth = isRetro ? 3.5 : 3;
     this.ctx.beginPath();
-    this.ctx.moveTo(0, this.crane.pivotY - 10);
-    this.ctx.lineTo(this.baseWidth, this.crane.pivotY - 10);
-    this.ctx.stroke();
-
-    // 桁架交叉格子
-    if (!isRetro) {
-      this.ctx.strokeStyle = '#7f8c8d';
-      this.ctx.lineWidth = 1.5;
-      this.ctx.beginPath();
-      for (let cx = 10; cx < this.baseWidth; cx += 40) {
-        this.ctx.moveTo(cx, this.crane.pivotY - 10);
-        this.ctx.lineTo(cx + 20, this.crane.pivotY);
-        this.ctx.moveTo(cx + 20, this.crane.pivotY - 10);
-        this.ctx.lineTo(cx, this.crane.pivotY);
-      }
-      this.ctx.stroke();
-    }
-
-    // 导轨滑轮滑块 (跟随 pendulum 重心动态水平平移)
-    this.ctx.fillStyle = isRetro ? '#0f380f' : '#34495e';
-    this.ctx.fillRect(trolleyX - 20, this.crane.pivotY - 15, 40, 15);
-
-    // 警示闪烁黄灯 (操作员指示灯)
-    if (!isRetro) {
-      const beaconAlpha = 0.4 + Math.sin(this.crane.time * 6) * 0.4;
-      this.ctx.fillStyle = `rgba(255, 170, 0, ${beaconAlpha + 0.2})`;
-      this.ctx.beginPath();
-      this.ctx.arc(trolleyX, this.crane.pivotY - 18, 4.5, 0, Math.PI * 2);
-      this.ctx.fill();
-    }
-
-    // 滑块金属轮毂与旋转辐条
-    this.ctx.fillStyle = isRetro ? '#0f380f' : '#7f8c8d';
-    this.ctx.beginPath();
-    this.ctx.arc(trolleyX, this.crane.pivotY, 6, 0, Math.PI * 2);
-    this.ctx.fill();
-
-    // 2. 动态柔性吊绳 (随力学张力微变)
-    this.ctx.strokeStyle = isRetro ? '#0f380f' : '#7f8c8d';
-    this.ctx.lineWidth = isRetro ? 3 : 2;
-    this.ctx.beginPath();
-    this.ctx.moveTo(trolleyX, this.crane.pivotY);
+    this.ctx.moveTo(trolleyX, -30);
     this.ctx.lineTo(swingX, swingY);
     this.ctx.stroke();
 
-    // 3. 吊绳底端金属机械爪 (带脱钩张开与离心倾角)
+    // 2. 吊绳与方块顶部的连接挂钩/夹爪
     if (!isRetro) {
       this.ctx.save();
       this.ctx.translate(swingX, swingY);
       this.ctx.rotate(this.crane.angle);
 
-      // 吊爪滑环
-      this.ctx.fillStyle = '#34495e';
-      this.ctx.strokeStyle = '#2c3e50';
+      // 金属连接环/夹爪
+      this.ctx.fillStyle = '#334155';
+      this.ctx.strokeStyle = '#0f172a';
       this.ctx.lineWidth = 2;
-      this.ctx.beginPath();
-      this.ctx.arc(0, 0, 8, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.stroke();
+      this.ctx.fillRect(-8, -4, 16, 8);
+      this.ctx.strokeRect(-8, -4, 16, 8);
 
-      // 左右对称机械臂 (带有脱钩张开 clawSpread 动画)
-      this.ctx.strokeStyle = '#7f8c8d';
-      this.ctx.lineWidth = 4;
-      this.ctx.lineCap = 'round';
-      
+      // 双挂钩爪臂
       const spread = this.crane.clawSpread || 0;
+      this.ctx.strokeStyle = '#475569';
+      this.ctx.lineWidth = 3.5;
+      this.ctx.lineCap = 'round';
 
-      // 左机械臂
       this.ctx.beginPath();
-      this.ctx.moveTo(-4, 0);
-      this.ctx.quadraticCurveTo(-18 - spread * 0.5, 10, -22 - spread, 28);
+      this.ctx.moveTo(-6, 4);
+      this.ctx.lineTo(-12 - spread, 18);
+      this.ctx.moveTo(6, 4);
+      this.ctx.lineTo(12 + spread, 18);
       this.ctx.stroke();
-
-      // 右机械臂
-      this.ctx.beginPath();
-      this.ctx.moveTo(4, 0);
-      this.ctx.quadraticCurveTo(18 + spread * 0.5, 10, 22 + spread, 28);
-      this.ctx.stroke();
-
-      // 爪钩尖端防滑胶垫
-      this.ctx.fillStyle = '#1e252b';
-      this.ctx.fillRect(-24 - spread, 26, 4, 6);
-      this.ctx.fillRect(20 + spread, 26, 4, 6);
 
       this.ctx.restore();
     } else {
-      // 复古小挂钩
       this.ctx.fillStyle = '#0f380f';
-      this.ctx.beginPath();
-      this.ctx.arc(swingX, swingY, 5, 0, Math.PI * 2);
-      this.ctx.fill();
+      this.ctx.fillRect(swingX - 4, swingY - 2, 8, 6);
     }
 
     this.ctx.restore();
 
-    // 4. 绘制挂载中且未下落的方块 (跟随伸缩绳索位置)
+    // 3. 绘制挂载中且未下落的方块
     if (!this.fallingBlock && this.state === 'PLAYING') {
       const block = this.swingingBlock;
       this.drawScandinavianBlock(swingX, swingY + 12, block.w, block.h, isRetro, 999);
