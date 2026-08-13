@@ -279,6 +279,44 @@ class Particle {
   }
 }
 
+// 落地冲击横向烟尘粒子
+class SmokeParticle {
+  constructor(x, y, color, dirX, themeRetro = false) {
+    this.x = x;
+    this.y = y;
+    this.color = color;
+    this.themeRetro = themeRetro;
+    this.vx = dirX * (Math.random() * 4.5 + 2.5);
+    this.vy = -Math.random() * 1.5;
+    this.alpha = 0.8;
+    this.decay = Math.random() * 0.04 + 0.025;
+    this.size = Math.random() * 5 + 3;
+  }
+
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.vx *= 0.90;
+    this.alpha -= this.decay;
+    this.size += 0.25;
+  }
+
+  draw(ctx) {
+    if (this.alpha <= 0) return;
+    ctx.save();
+    ctx.globalAlpha = this.alpha;
+    ctx.fillStyle = this.color;
+    if (this.themeRetro) {
+      ctx.fillRect(Math.floor(this.x), Math.floor(this.y), this.size, this.size);
+    } else {
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
 class ParticleSystem {
   constructor() {
     this.particles = [];
@@ -287,6 +325,13 @@ class ParticleSystem {
   emit(x, y, color, count = 15, themeRetro = false) {
     for (let i = 0; i < count; i++) {
       this.particles.push(new Particle(x, y, color, themeRetro));
+    }
+  }
+
+  emitDust(x, y, color = '#d2dae2', themeRetro = false) {
+    for (let i = 0; i < 8; i++) {
+      this.particles.push(new SmokeParticle(x, y, color, -1, themeRetro));
+      this.particles.push(new SmokeParticle(x, y, color, 1, themeRetro));
     }
   }
 
@@ -684,14 +729,18 @@ class TowerBloxxGame {
     const swingX = this.baseWidth / 2 + Math.sin(this.crane.angle) * this.crane.length;
     const swingY = this.crane.pivotY + Math.cos(this.crane.angle) * this.crane.length;
     
-    // A2: 修复释放瞬间坐标偏移，需包含吊钩偏移量(+12)与方块高度
     const groundY = this.baseHeight - 120;
     const worldY = groundY - (swingY + 12) - this.swingingBlock.h + this.camera.y;
 
+    // 重力下落物理：初始下落速度较小，带加速度、抛体惯性与脱钩倾斜角
     this.fallingBlock = {
       x: swingX,
       y: worldY,
-      vy: 12, // 匀速下落物理速度
+      vy: 3,                                            // 初始下落较软
+      gravity: 0.85,                                     // 重力加速度 (越落下落越快!)
+      vx: Math.sin(this.crane.angle) * 3.2,              // 水平脱钩惯性
+      angle: this.crane.angle,                           // 继承吊车脱钩时的倾角
+      vAngle: Math.sin(this.crane.angle) * -0.04,        // 姿态空中微摇
       w: this.swingingBlock.w,
       h: this.swingingBlock.h
     };
@@ -833,10 +882,15 @@ class TowerBloxxGame {
     const dy = this.camera.targetY - this.camera.y;
     this.camera.y += dy * this.camera.ease * dtFactor;
 
-    // 7. 下落方块物理检测
+    // 7. 下落方块重力物理检测
     if (this.fallingBlock) {
-      this.fallingBlock.y -= this.fallingBlock.vy * dtFactor; // dtFactor 缩放下落
-      
+      const block = this.fallingBlock;
+      block.vy += block.gravity * dtFactor;            // 重力加速度让小房子越落越快！
+      block.y -= block.vy * dtFactor;                  // 纵向下落
+      block.x += block.vx * dtFactor;                  // 水平微小惯性平移
+      block.angle += block.vAngle * dtFactor;          // 空中姿态微摆
+      block.angle *= Math.pow(0.92, dtFactor);         // 空气阻力矫正下落姿态
+
       let targetY = 0;
       if (this.tower.length > 0) {
         targetY = this.tower[this.tower.length - 1].y + this.blockHeight;
@@ -963,7 +1017,11 @@ class TowerBloxxGame {
     // E4: 居民增加
     const popAdd = Math.floor(Math.random() * 50) + 30;
     this.population += popAdd;
-    this.triggerShake(4, 8); // E3: 普通落地微震
+    this.triggerShake(5, 10); // 落地打压震屏
+    
+    // 触发烟尘效果
+    const dustColor = this.theme === 'retro' ? '#0f380f' : '#cbd5e1';
+    this.particles.emitDust(landing.x, landingScreenY, dustColor, this.theme === 'retro');
 
     // 压入已固定的楼层列表
     this.tower.push({
@@ -1258,17 +1316,58 @@ class TowerBloxxGame {
     }
   }
 
-  // 绘制下落中楼层
+  // 绘制下落中楼层 (真实物理下落：包含目标楼顶投影、速度风噪拖尾、下落倾角)
   drawFallingBlock() {
     if (!this.fallingBlock) return;
     const block = this.fallingBlock;
     const isRetro = this.theme === 'retro';
+    const groundY = this.baseHeight - 120;
     
-    // 【BUG 修复】：坠落块渲染坐标计算 drawY = 地面 - 坠落物理Y + 相机上升偏移
-    // A1: 修复下落方块渲染跳跃（需减去方块自身高度）
     const drawY = this.baseHeight - 120 - block.h - block.y + this.camera.y;
 
-    this.drawScandinavianBlock(block.x, drawY, block.w, block.h, isRetro, 999);
+    // 1. 绘制目标楼顶的接触预判动态阴影 (Target Roof Impact Shadow)
+    let targetY = 0;
+    if (this.tower.length > 0) {
+      targetY = this.tower[this.tower.length - 1].y + this.blockHeight;
+    }
+    const targetScreenY = groundY - targetY + this.camera.y;
+    const distToTarget = Math.max(0, block.y - targetY);
+    const maxDist = 350;
+    const shadowFactor = Math.max(0, 1 - distToTarget / maxDist);
+
+    if (shadowFactor > 0.05) {
+      this.ctx.save();
+      const shadowW = block.w * (0.5 + shadowFactor * 0.5);
+      const shadowH = 8 * shadowFactor;
+      this.ctx.fillStyle = isRetro ? 'rgba(15, 56, 15, 0.4)' : 'rgba(0, 0, 0, 0.35)';
+      this.ctx.beginPath();
+      this.ctx.ellipse(block.x, targetScreenY, shadowW / 2, shadowH / 2, 0, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
+    }
+
+    // 2. 绘制下落高速风噪拖尾线 (High-speed Motion Blur Trail)
+    if (!isRetro && block.vy > 6) {
+      this.ctx.save();
+      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+      this.ctx.lineWidth = 1.5;
+      for (let i = -1; i <= 1; i += 2) {
+        const lx = block.x + (i * block.w * 0.35);
+        const trailLen = Math.min(35, block.vy * 2.2);
+        this.ctx.beginPath();
+        this.ctx.moveTo(lx, drawY + block.h / 2);
+        this.ctx.lineTo(lx, drawY + block.h / 2 - trailLen);
+        this.ctx.stroke();
+      }
+      this.ctx.restore();
+    }
+
+    // 3. 带有脱钩倾斜角与姿态下落的小房子
+    this.ctx.save();
+    this.ctx.translate(block.x, drawY + block.h / 2);
+    this.ctx.rotate(block.angle || 0);
+    this.drawScandinavianBlock(0, -block.h / 2, block.w, block.h, isRetro, 999);
+    this.ctx.restore();
   }
 
   // 绘制经典的北欧简直风格方形建筑单元
