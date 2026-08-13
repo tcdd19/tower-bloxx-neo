@@ -1622,6 +1622,60 @@ class TowerBloxxGame {
     }
   }
 
+  // 绘制下落中楼层 (真实物理下落：包含目标楼顶投影、速度风噪拖尾、下落倾角)
+  drawFallingBlock() {
+    if (!this.fallingBlock) return;
+    const block = this.fallingBlock;
+    const isRetro = this.theme === 'retro';
+    const groundY = this.baseHeight - 120;
+    
+    const drawY = this.baseHeight - 120 - block.h - block.y + this.camera.y;
+
+    // 1. 绘制目标楼顶的接触预判动态阴影 (Target Roof Impact Shadow)
+    let targetY = 0;
+    if (this.tower.length > 0) {
+      targetY = this.tower[this.tower.length - 1].y + this.blockHeight;
+    }
+    const targetScreenY = groundY - targetY + this.camera.y;
+    const distToTarget = Math.max(0, block.y - targetY);
+    const maxDist = 350;
+    const shadowFactor = Math.max(0, 1 - distToTarget / maxDist);
+
+    if (shadowFactor > 0.05) {
+      this.ctx.save();
+      const shadowW = block.w * (0.5 + shadowFactor * 0.5);
+      const shadowH = 8 * shadowFactor;
+      this.ctx.fillStyle = isRetro ? 'rgba(15, 56, 15, 0.4)' : 'rgba(0, 0, 0, 0.35)';
+      this.ctx.beginPath();
+      this.ctx.ellipse(block.x, targetScreenY, shadowW / 2, shadowH / 2, 0, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
+    }
+
+    // 2. 绘制下落高速风噪拖尾线 (High-speed Motion Blur Trail)
+    if (!isRetro && block.vy > 6) {
+      this.ctx.save();
+      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+      this.ctx.lineWidth = 1.5;
+      for (let i = -1; i <= 1; i += 2) {
+        const lx = block.x + (i * block.w * 0.35);
+        const trailLen = Math.min(35, block.vy * 2.2);
+        this.ctx.beginPath();
+        this.ctx.moveTo(lx, drawY + block.h / 2);
+        this.ctx.lineTo(lx, drawY + block.h / 2 - trailLen);
+        this.ctx.stroke();
+      }
+      this.ctx.restore();
+    }
+
+    // 3. 带有脱钩倾斜角与姿态下落的小房子
+    this.ctx.save();
+    this.ctx.translate(block.x, drawY + block.h / 2);
+    this.ctx.rotate(block.angle || 0);
+    this.drawScandinavianBlock(0, -block.h / 2, block.w, block.h, isRetro, 999, 0);
+    this.ctx.restore();
+  }
+
   // 绘制诺基亚原版 2.5D 伪立体建筑单元 (走心与精致渲染)
   // viewAngle: 当前视角偏转角 (负 = 看到左侧面, 正 = 看到右侧面)
   drawScandinavianBlock(x, y, w, h, isRetro, idx, viewAngle) {
