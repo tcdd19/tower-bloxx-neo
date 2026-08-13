@@ -390,7 +390,7 @@ class TowerBloxxGame {
     this.blockHeight = 55;  
     this.tower = [];
     
-    // 吊车与绳子参数
+    // 吊车与绳子参数 (包含反冲、拉伸、爪子张合与人控摆动)
     this.crane = {
       pivotX: 0,
       pivotY: 65,
@@ -398,7 +398,9 @@ class TowerBloxxGame {
       angle: 0,
       angleRange: Math.PI / 4.5,
       speed: 0.022,
-      time: 0
+      time: 0,
+      ropeStretch: 0,  // 脱钩绳索弹起 & 载重伸缩
+      clawSpread: 0    // 爪子张合动态
     };
     
     // 当前悬浮方块
@@ -725,12 +727,21 @@ class TowerBloxxGame {
 
     this.synth.playDrop();
 
-    // 算出悬挂绳底端的世界坐标系 (包含摄像机镜头移动偏移的 Y 值)
-    const swingX = this.baseWidth / 2 + Math.sin(this.crane.angle) * this.crane.length;
-    const swingY = this.crane.pivotY + Math.cos(this.crane.angle) * this.crane.length;
+    // 机械动作：脱钩瞬间绳索向上剧烈反冲弹回，爪子瞬间张开
+    this.crane.ropeStretch = -12;
+    this.crane.clawSpread = 14;
+
+    const currentRopeLen = this.crane.length + this.crane.ropeStretch;
+    const trolleyX = this.baseWidth / 2 + Math.sin(this.crane.angle) * 16;
+    const swingX = trolleyX + Math.sin(this.crane.angle) * currentRopeLen;
+    const swingY = this.crane.pivotY + Math.cos(this.crane.angle) * currentRopeLen;
     
     const groundY = this.baseHeight - 120;
     const worldY = groundY - (swingY + 12) - this.swingingBlock.h + this.camera.y;
+
+    // 释放顶部机械蒸汽
+    const isRetro = this.theme === 'retro';
+    this.particles.emitDust(trolleyX, this.crane.pivotY, isRetro ? '#0f380f' : '#ffffff', isRetro);
 
     // 重力下落物理：初始下落速度较小，带加速度、抛体惯性与脱钩倾斜角
     this.fallingBlock = {
@@ -878,10 +889,18 @@ class TowerBloxxGame {
     // 4. 楼体晃动物理
     this.updateTowerSway(dtFactor);
 
-    // 5. 吊车摆动更新 (正弦平滑摆动 + dt 缩放)
+    // 5. 吊车人控微摇与绳索物理衰减
     this.crane.time += this.crane.speed * dtFactor;
+    // 绳索脱钩弹起反冲衰减
+    this.crane.ropeStretch *= Math.pow(0.82, dtFactor);
+    // 爪子张开动态归位
+    const targetClaw = (this.fallingBlock || this.state !== 'PLAYING') ? 10 : 0;
+    this.crane.clawSpread += (targetClaw - this.crane.clawSpread) * 0.15 * dtFactor;
+
+    // 融入人工控操游隙与气流微摆 (双重谐波)
+    const organicWobble = Math.sin(this.crane.time * 2.4) * 0.035;
     const swingModifier = Math.max(0.4, 1.2 - this.tower.length * 0.015);
-    this.crane.angle = Math.sin(this.crane.time) * this.crane.angleRange * swingModifier;
+    this.crane.angle = (Math.sin(this.crane.time) * this.crane.angleRange + organicWobble) * swingModifier;
 
     // 6. 摄像机纵向平滑过渡
     const dy = this.camera.targetY - this.camera.y;
@@ -1474,13 +1493,17 @@ class TowerBloxxGame {
     this.ctx.stroke();
   }
 
-  // 绘制顶部吊架、机械吊爪系统
+  // 绘制顶部吊架、动态滑快与机械吊爪系统
   drawCrane() {
     const isRetro = this.theme === 'retro';
     
+    // 顶部导轨滑块跟摆 (Trolley offset)
+    const trolleyX = this.baseWidth / 2 + Math.sin(this.crane.angle) * 16;
+    const currentRopeLen = this.crane.length + this.crane.ropeStretch;
+    
     // 绳爪连接顶端的世界 X, Y
-    const swingX = this.baseWidth / 2 + Math.sin(this.crane.angle) * this.crane.length;
-    const swingY = this.crane.pivotY + Math.cos(this.crane.angle) * this.crane.length;
+    const swingX = trolleyX + Math.sin(this.crane.angle) * currentRopeLen;
+    const swingY = this.crane.pivotY + Math.cos(this.crane.angle) * currentRopeLen;
 
     this.ctx.save();
 
@@ -1492,7 +1515,7 @@ class TowerBloxxGame {
     this.ctx.lineTo(this.baseWidth, this.crane.pivotY - 10);
     this.ctx.stroke();
 
-    // 绘制桁架交叉格子，看起来更硬朗有重工业机械感
+    // 桁架交叉格子
     if (!isRetro) {
       this.ctx.strokeStyle = '#7f8c8d';
       this.ctx.lineWidth = 1.5;
@@ -1506,31 +1529,40 @@ class TowerBloxxGame {
       this.ctx.stroke();
     }
 
-    // 导轨滑轮滑块 (Trolley)
+    // 导轨滑轮滑块 (跟随 pendulum 重心动态水平平移)
     this.ctx.fillStyle = isRetro ? '#0f380f' : '#34495e';
-    this.ctx.fillRect(this.baseWidth / 2 - 20, this.crane.pivotY - 15, 40, 15);
+    this.ctx.fillRect(trolleyX - 20, this.crane.pivotY - 15, 40, 15);
 
-    // B3: 导轨中央金属滑轮 (Pulley Wheel)，解决大角度摆动断连问题
+    // 警示闪烁黄灯 (操作员指示灯)
+    if (!isRetro) {
+      const beaconAlpha = 0.4 + Math.sin(this.crane.time * 6) * 0.4;
+      this.ctx.fillStyle = `rgba(255, 170, 0, ${beaconAlpha + 0.2})`;
+      this.ctx.beginPath();
+      this.ctx.arc(trolleyX, this.crane.pivotY - 18, 4.5, 0, Math.PI * 2);
+      this.ctx.fill();
+    }
+
+    // 滑块金属轮毂与旋转辐条
     this.ctx.fillStyle = isRetro ? '#0f380f' : '#7f8c8d';
     this.ctx.beginPath();
-    this.ctx.arc(this.baseWidth / 2, this.crane.pivotY, 6, 0, Math.PI * 2);
+    this.ctx.arc(trolleyX, this.crane.pivotY, 6, 0, Math.PI * 2);
     this.ctx.fill();
 
-    // 2. 吊绳
+    // 2. 动态柔性吊绳 (随力学张力微变)
     this.ctx.strokeStyle = isRetro ? '#0f380f' : '#7f8c8d';
     this.ctx.lineWidth = isRetro ? 3 : 2;
     this.ctx.beginPath();
-    this.ctx.moveTo(this.baseWidth / 2, this.crane.pivotY);
+    this.ctx.moveTo(trolleyX, this.crane.pivotY);
     this.ctx.lineTo(swingX, swingY);
     this.ctx.stroke();
 
-    // 3. 【重点视觉】：吊绳底端金属吊钩/机械爪 (Claw)
+    // 3. 吊绳底端金属机械爪 (带脱钩张开与离心倾角)
     if (!isRetro) {
       this.ctx.save();
       this.ctx.translate(swingX, swingY);
-      this.ctx.rotate(this.crane.angle); // 机械爪跟随绳子角度摆动
+      this.ctx.rotate(this.crane.angle);
 
-      // 吊爪滑环 (圆圈)
+      // 吊爪滑环
       this.ctx.fillStyle = '#34495e';
       this.ctx.strokeStyle = '#2c3e50';
       this.ctx.lineWidth = 2;
@@ -1539,27 +1571,29 @@ class TowerBloxxGame {
       this.ctx.fill();
       this.ctx.stroke();
 
-      // 左右两侧对称的钢架爪子弯曲结构
+      // 左右对称机械臂 (带有脱钩张开 clawSpread 动画)
       this.ctx.strokeStyle = '#7f8c8d';
       this.ctx.lineWidth = 4;
       this.ctx.lineCap = 'round';
       
+      const spread = this.crane.clawSpread || 0;
+
       // 左机械臂
       this.ctx.beginPath();
       this.ctx.moveTo(-4, 0);
-      this.ctx.quadraticCurveTo(-18, 10, -22, 28);
+      this.ctx.quadraticCurveTo(-18 - spread * 0.5, 10, -22 - spread, 28);
       this.ctx.stroke();
 
       // 右机械臂
       this.ctx.beginPath();
       this.ctx.moveTo(4, 0);
-      this.ctx.quadraticCurveTo(18, 10, 22, 28);
+      this.ctx.quadraticCurveTo(18 + spread * 0.5, 10, 22 + spread, 28);
       this.ctx.stroke();
 
-      // 爪钩尖端防滑胶垫 (小黑块)
+      // 爪钩尖端防滑胶垫
       this.ctx.fillStyle = '#1e252b';
-      this.ctx.fillRect(-24, 26, 4, 6);
-      this.ctx.fillRect(20, 26, 4, 6);
+      this.ctx.fillRect(-24 - spread, 26, 4, 6);
+      this.ctx.fillRect(20 + spread, 26, 4, 6);
 
       this.ctx.restore();
     } else {
@@ -1572,10 +1606,9 @@ class TowerBloxxGame {
 
     this.ctx.restore();
 
-    // 4. 绘制挂载中且未下落的方块
+    // 4. 绘制挂载中且未下落的方块 (跟随伸缩绳索位置)
     if (!this.fallingBlock && this.state === 'PLAYING') {
       const block = this.swingingBlock;
-      // 摆块上方挂扣在吊爪之间
       this.drawScandinavianBlock(swingX, swingY + 12, block.w, block.h, isRetro, 999);
     }
   }
