@@ -955,62 +955,83 @@ class TowerBloxxGame {
     if (!el) return;
     el.classList.remove('hidden');
     el.style.display = displayType;
+    el.style.opacity = '1';
+    el.style.pointerEvents = 'auto';
   }
 
   hideElement(el) {
     if (!el) return;
     el.classList.add('hidden');
     el.style.display = 'none';
+    el.style.opacity = '0';
+    el.style.pointerEvents = 'none';
   }
 
   startGame() {
+    console.log("🚀 [GameEngine] startGame triggered!");
     try {
-      this.synth.init();
-    } catch (e) {
-      console.warn("音频防护:", e);
+      try {
+        if (this.synth) this.synth.init();
+      } catch (e) {
+        console.warn("音频防护:", e);
+      }
+      
+      this.score = 0;
+      this.population = 0;
+      this.combo = 0;
+      this.maxCombo = 0;
+      this.lives = 3;
+      this.tower = [];
+      this.fallingBlock = null;
+      this.collapseBlocks = [];
+      if (this.particles && this.particles.clear) this.particles.clear();
+      this.floatingTexts = [];
+      this.spriteEffects = [];
+      
+      this.swingingBlock = {
+        w: this.blockWidth || 85,
+        h: this.blockHeight || 55
+      };
+      if (this.crane) this.crane.speed = 0.022;
+      
+      this.camera.y = 0;
+      this.camera.targetY = 0;
+
+      this.towerSway = {
+        amplitude: 0,
+        frequency: 0.012,
+        offset: 0,
+        time: 0,
+        instability: 0
+      };
+
+      this.state = 'PLAYING';
+      
+      this.hideElement(this.dom.startMenu);
+      this.hideElement(this.dom.settingsMenu);
+      this.hideElement(this.dom.gameOverScreen);
+      this.hideElement(this.dom.pauseMenu);
+      this.hideElement(this.dom.victoryMenu);
+      
+      // 强效保证 startMenu 被完全隐藏，绝不遮挡游戏画板
+      if (this.dom && this.dom.startMenu) {
+        this.dom.startMenu.classList.add('hidden');
+        this.dom.startMenu.style.display = 'none';
+        this.dom.startMenu.style.opacity = '0';
+        this.dom.startMenu.style.pointerEvents = 'none';
+      }
+
+      this.showElement(this.dom.hudOverlay, 'flex');
+      this.showElement(this.dom.tapInstruction, 'block');
+      
+      this.updateHUD();
+    } catch (err) {
+      console.error("❌ startGame 异常防爆:", err);
+      if (this.dom && this.dom.startMenu) {
+        this.dom.startMenu.style.display = 'none';
+        this.dom.startMenu.style.pointerEvents = 'none';
+      }
     }
-    
-    this.score = 0;
-    this.population = 0;
-    this.combo = 0;
-    this.maxCombo = 0;
-    this.lives = 3;
-    this.tower = [];
-    this.fallingBlock = null;
-    this.collapseBlocks = [];
-    this.particles.clear();
-    this.floatingTexts = [];
-    this.spriteEffects = [];
-    
-    this.swingingBlock = {
-      w: this.blockWidth,
-      h: this.blockHeight
-    };
-    this.crane.speed = 0.022;
-    
-    this.camera.y = 0;
-    this.camera.targetY = 0;
-
-    this.towerSway = {
-      amplitude: 0,
-      frequency: 0.012,
-      offset: 0,
-      time: 0,
-      instability: 0
-    };
-
-    this.state = 'PLAYING';
-    
-    this.hideElement(this.dom.startMenu);
-    this.hideElement(this.dom.settingsMenu);
-    this.hideElement(this.dom.gameOverScreen);
-    this.hideElement(this.dom.pauseMenu);
-    this.hideElement(this.dom.victoryMenu);
-    
-    this.showElement(this.dom.hudOverlay, 'flex');
-    this.showElement(this.dom.tapInstruction, 'block');
-    
-    this.updateHUD();
   }
 
   pauseGame() {
