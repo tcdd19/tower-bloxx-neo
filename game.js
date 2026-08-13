@@ -759,7 +759,11 @@ class TowerBloxxGame {
       pauseMenu: document.getElementById('pause-menu'),
       btnResumeGame: document.getElementById('btn-resume-game'),
       btnPauseHome: document.getElementById('btn-pause-home'),
-      populationVal: document.getElementById('population-val')
+      populationVal: document.getElementById('population-val'),
+      victoryMenu: document.getElementById('victory-menu'),
+      victoryScoreVal: document.getElementById('victory-score-val'),
+      victoryPopVal: document.getElementById('victory-pop-val'),
+      victoryComboVal: document.getElementById('victory-combo-val')
     };
 
     this.initEvents();
@@ -951,6 +955,7 @@ class TowerBloxxGame {
     this.hideElement(this.dom.settingsMenu);
     this.hideElement(this.dom.gameOverScreen);
     this.hideElement(this.dom.pauseMenu);
+    this.hideElement(this.dom.victoryMenu);
     
     this.showElement(this.dom.hudOverlay, 'flex');
     this.showElement(this.dom.tapInstruction, 'block');
@@ -1096,6 +1101,37 @@ class TowerBloxxGame {
     this.hideElement(this.dom.hudOverlay);
     this.hideElement(this.dom.tapInstruction);
     this.showElement(this.dom.gameOverScreen, 'flex');
+  }
+
+  // 50 层摩天大楼完美封顶胜利结算
+  triggerVictory() {
+    this.state = 'VICTORY';
+    this.synth.playPerfect(10);
+    this.haptics.vibratePerfect();
+
+    // 触发 50 颗粒全屏祝贺烟花与星光粒子
+    const topY = this.baseHeight - 120 - this.tower.length * this.blockHeight + this.camera.y;
+    for (let i = 0; i < 30; i++) {
+      const fx = this.baseWidth / 2 + (Math.random() - 0.5) * 220;
+      const fy = topY - Math.random() * 150;
+      this.particles.emit(fx, fy, '#ffd166', 20, false);
+      this.particles.emit(fx, fy, '#38bdf8', 20, false);
+      this.spriteEffects.push(new SparkleStar(fx, fy, 2.5));
+    }
+
+    if (this.score > this.highScore) {
+      this.highScore = this.score;
+      try {
+        localStorage.setItem('tower_bloxx_highscore', this.highScore);
+      } catch (e) {}
+    }
+
+    if (this.dom.victoryMenu) {
+      if (this.dom.victoryScoreVal) this.dom.victoryScoreVal.textContent = this.score;
+      if (this.dom.victoryPopVal) this.dom.victoryPopVal.textContent = `${this.population} 人`;
+      if (this.dom.victoryComboVal) this.dom.victoryComboVal.textContent = `x${this.maxCombo}`;
+      this.showElement(this.dom.victoryMenu, 'flex');
+    }
   }
 
   // E3: 触发屏幕震动
@@ -1396,17 +1432,20 @@ class TowerBloxxGame {
 
     this.updateHUD();
 
-    // 随高度轻微变窄
-    const minWidth = 40;
-    const newWidth = Math.max(minWidth, this.blockWidth - this.tower.length * 1.2);
-    this.swingingBlock.w = newWidth;
+    // 保持大气标准的 80px 宽度 (不再随高度缩窄挤压，保证舒展爽快盖楼体验)
+    this.swingingBlock.w = this.blockWidth;
 
-    // 摆动速度随高度轻微加快
+    // 摆动速度随高度轻微加快 (提供平滑递进的挑战感)
     this.crane.speed = 0.022 + Math.min(0.04, this.tower.length * 0.001);
 
     // 【镜头上升逻辑】：让摄像机平滑追踪最顶层的 Y 轴高度，留出空间盖新房子
     if (this.tower.length * this.blockHeight > 200) {
       this.camera.targetY = this.tower.length * this.blockHeight - 200;
+    }
+
+    // 【50 层摩天大楼完美封顶胜利判定】
+    if (this.tower.length >= 50) {
+      this.triggerVictory();
     }
   }
 
@@ -1544,16 +1583,33 @@ class TowerBloxxGame {
       }
     }
 
-    if (altitude < 1000) {
-      const mntImg = this.loader.assets['bg_mountains'];
-      if (mntImg && mntImg.complete) {
-        const mntW = 59 * 3;
-        const mntH = 12 * 3;
-        const mntY = this.baseHeight - 120 - mntH + altitude * 0.3;
-        for (let x = -50; x < this.baseWidth + 50; x += mntW) {
-          this.ctx.drawImage(mntImg, x, mntY, mntW, mntH);
+    // 远景 HD 2.5D 现代摩天大楼剪影 (100% 矢量超高清重绘替代 59x12 马赛克老图)
+    if (altitude < 1200) {
+      const skylineY = this.baseHeight - 120 + altitude * 0.25;
+      
+      this.ctx.save();
+      // 后排暗蓝大楼群剪影
+      this.ctx.fillStyle = '#012a4a';
+      for (let bx = -20; bx < this.baseWidth + 40; bx += 45) {
+        const bH = 65 + Math.sin(bx * 0.05) * 35;
+        this.ctx.fillRect(bx, skylineY - bH, 40, bH + 120);
+        
+        // 大楼窗户发光点阵
+        this.ctx.fillStyle = 'rgba(254, 240, 138, 0.35)';
+        for (let wy = skylineY - bH + 8; wy < skylineY - 10; wy += 14) {
+          this.ctx.fillRect(bx + 8, wy, 8, 5);
+          this.ctx.fillRect(bx + 24, wy, 8, 5);
         }
+        this.ctx.fillStyle = '#012a4a';
       }
+
+      // 前排深蓝大楼群剪影
+      this.ctx.fillStyle = '#014f86';
+      for (let bx = 10; bx < this.baseWidth + 40; bx += 55) {
+        const bH = 48 + Math.cos(bx * 0.08) * 28;
+        this.ctx.fillRect(bx, skylineY - bH, 48, bH + 120);
+      }
+      this.ctx.restore();
     }
 
     this.ctx.restore();
@@ -2200,14 +2256,69 @@ class TowerBloxxGame {
 
     this.ctx.save();
 
-    // 1. 吊车桁架臂
+    // 1. HD 2.5D 重工业钢结构桁架塔吊臂 (100% 矢量重绘替代老图)
     if (!isRetro) {
-      const boomImg = this.loader.assets['crane_boom_arm'];
-      if (boomImg && boomImg.complete) {
-        const boomW = 169 * 2.5;
-        const boomH = 10 * 2.5;
-        this.ctx.drawImage(boomImg, this.baseWidth / 2 - boomW / 2, this.crane.pivotY - 20, boomW, boomH);
+      const boomY = this.crane.pivotY - 22;
+      const boomW = this.baseWidth * 0.94;
+      const boomX = (this.baseWidth - boomW) / 2;
+      const boomH = 16;
+
+      // 吊臂主梁体 (暗色重工业钢构渐变)
+      const boomGrad = this.ctx.createLinearGradient(boomX, boomY, boomX, boomY + boomH);
+      boomGrad.addColorStop(0, '#475569');
+      boomGrad.addColorStop(0.5, '#1e293b');
+      boomGrad.addColorStop(1, '#0f172a');
+      this.ctx.fillStyle = boomGrad;
+      this.ctx.strokeStyle = '#020617';
+      this.ctx.lineWidth = 1.5;
+      this.drawRoundedRect(boomX, boomY, boomW, boomH, 3);
+      this.ctx.fill();
+      this.ctx.stroke();
+
+      // 顶部黄黑醒目工业警示条纹 (Industrial Safety Stripes)
+      const stripeW = 10;
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.drawRoundedRect(boomX + 1, boomY + 1, boomW - 2, boomH - 2, 2);
+      this.ctx.clip();
+      for (let sx = boomX - 20; sx < boomX + boomW + 20; sx += stripeW * 2) {
+        this.ctx.fillStyle = '#f59e0b';
+        this.ctx.beginPath();
+        this.ctx.moveTo(sx, boomY);
+        this.ctx.lineTo(sx + stripeW, boomY);
+        this.ctx.lineTo(sx + stripeW - 5, boomY + 4);
+        this.ctx.lineTo(sx - 5, boomY + 4);
+        this.ctx.closePath();
+        this.ctx.fill();
       }
+      this.ctx.restore();
+
+      // 钢结构 K 形斜撑格构 (HD Lattice Struts)
+      this.ctx.strokeStyle = 'rgba(148, 163, 184, 0.55)';
+      this.ctx.lineWidth = 1.2;
+      this.ctx.beginPath();
+      for (let lx = boomX + 12; lx < boomX + boomW - 12; lx += 22) {
+        this.ctx.moveTo(lx, boomY + 4);
+        this.ctx.lineTo(lx + 11, boomY + boomH - 4);
+        this.ctx.lineTo(lx + 22, boomY + 4);
+      }
+      this.ctx.stroke();
+
+      // 吊臂两端红色高空航空障碍警示灯 (Aviation Warning Light)
+      [boomX + 6, boomX + boomW - 6].forEach(lx => {
+        this.ctx.fillStyle = '#ef4444';
+        this.ctx.beginPath();
+        this.ctx.arc(lx, boomY - 2, 3.5, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        const lightHalo = this.ctx.createRadialGradient(lx, boomY - 2, 1, lx, boomY - 2, 10);
+        lightHalo.addColorStop(0, 'rgba(239, 68, 68, 0.85)');
+        lightHalo.addColorStop(1, 'rgba(239, 68, 68, 0)');
+        this.ctx.fillStyle = lightHalo;
+        this.ctx.beginPath();
+        this.ctx.arc(lx, boomY - 2, 10, 0, Math.PI * 2);
+        this.ctx.fill();
+      });
     }
 
     // 2. 主悬挂高强度重工业钢索 (4.0px 加粗粗缆绳 + 1.2px 钢芯高光，完美匹配吊钩)

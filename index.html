@@ -140,6 +140,30 @@
           <button id="btn-restart-game" class="btn btn-primary">再来一局</button>
           <button id="btn-return-home" class="btn btn-secondary">主菜单</button>
         </div>
+      <!-- 大楼成功封顶喜报弹窗 -->
+      <div id="victory-menu" class="menu-overlay hidden">
+        <h2 class="menu-title text-gold" style="color: #ffd166; text-shadow: 0 0 15px rgba(255, 209, 102, 0.6);">🎉 50层摩天大楼完美封顶！</h2>
+        <p class="game-subtitle" id="victory-subtitle">恭喜！你打造了一座璀璨的城市地标大楼！</p>
+        
+        <div class="results-board">
+          <div class="result-row">
+            <span>最终得分</span>
+            <span id="victory-score-val" class="result-value font-mono" style="color: #38bdf8;">0</span>
+          </div>
+          <div class="result-row">
+            <span>入住居民</span>
+            <span id="victory-pop-val" class="result-value font-mono" style="color: #ffd166;">0 人</span>
+          </div>
+          <div class="result-row">
+            <span>最高连击</span>
+            <span id="victory-combo-val" class="result-value font-mono" style="color: #4ade80;">x0</span>
+          </div>
+        </div>
+
+        <div class="button-group">
+          <button id="btn-victory-restart" class="btn btn-primary" onclick="window.gameInstance && window.gameInstance.startGame()">挑战下一座大楼</button>
+          <button id="btn-victory-home" class="btn btn-secondary" onclick="window.gameInstance && window.gameInstance.showStartMenu()">返回主菜单</button>
+        </div>
       </div>
 
       <!-- 暂停菜单弹窗 -->
