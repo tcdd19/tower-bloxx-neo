@@ -1604,21 +1604,53 @@ class TowerBloxxGame {
     this.ctx.restore();
   }
 
-  // 绘制诺基亚原版经典风格建筑单元 (Cyan Teal Body, Yellow Roof, Twin Windows)
+  // 绘制诺基亚原版 2.5D 伪立体建筑单元 (正面 + 顶面 + 右侧面)
   drawScandinavianBlock(x, y, w, h, isRetro, idx) {
     this.ctx.save();
 
+    // 2.5D 透视参数：顶面偏移与右侧面宽度
+    const depthX = 10;  // 顶面向右偏移量
+    const depthY = 8;   // 顶面向上偏移量
+    const sideW = 10;   // 右侧面宽度
+
+    // 方块左上角坐标
+    const lx = x - w / 2;
+    const rx = x + w / 2;
+
     if (isRetro) {
-      this.ctx.fillStyle = '#8bac0f';
+      // 复古 Game Boy 风格也加上 2.5D
+      // 右侧面
+      this.ctx.fillStyle = '#306230';
+      this.ctx.beginPath();
+      this.ctx.moveTo(rx, y);
+      this.ctx.lineTo(rx + sideW, y - depthY);
+      this.ctx.lineTo(rx + sideW, y + h - depthY);
+      this.ctx.lineTo(rx, y + h);
+      this.ctx.closePath();
+      this.ctx.fill();
       this.ctx.strokeStyle = '#0f380f';
-      this.ctx.lineWidth = 3;
-      
-      this.ctx.fillRect(x - w / 2, y, w, h);
-      this.ctx.strokeRect(x - w / 2, y, w, h);
+      this.ctx.lineWidth = 2;
+      this.ctx.stroke();
+
+      // 顶面
+      this.ctx.fillStyle = '#9bbc0f';
+      this.ctx.beginPath();
+      this.ctx.moveTo(lx, y);
+      this.ctx.lineTo(lx + depthX, y - depthY);
+      this.ctx.lineTo(rx + depthX, y - depthY);
+      this.ctx.lineTo(rx, y);
+      this.ctx.closePath();
+      this.ctx.fill();
+      this.ctx.stroke();
+
+      // 正面
+      this.ctx.fillStyle = '#8bac0f';
+      this.ctx.fillRect(lx, y, w, h);
+      this.ctx.strokeRect(lx, y, w, h);
 
       // 复古双窗
-      const retroWinW = Math.max(8, Math.floor(w * 0.2));
-      const retroWinH = Math.max(12, Math.floor(h * 0.42));
+      const retroWinW = Math.max(8, Math.floor(w * 0.18));
+      const retroWinH = Math.max(12, Math.floor(h * 0.4));
       this.ctx.fillStyle = '#0f380f';
       this.ctx.fillRect(x - retroWinW - 3, y + (h - retroWinH) / 2, retroWinW, retroWinH);
       this.ctx.fillRect(x + 3, y + (h - retroWinH) / 2, retroWinW, retroWinH);
@@ -1626,39 +1658,79 @@ class TowerBloxxGame {
       return;
     }
 
-    // --- 诺基亚原版标志性湖蓝青绿建筑配色 (经典 1:1 还原) ---
-    const baseColor = '#00b4d8';   // 诺基亚原版湖青蓝
-    const shadowColor = '#0077b6'; // 侧边深蓝阴影
-    const roofColor = '#ffc300';   // 黄色顶饰条
+    // --- 诺基亚原版 2.5D 湖蓝建筑 (正面 + 顶面 + 右侧面) ---
+    const frontColor = '#00b4d8';   // 正面湖青蓝
+    const topColor = '#48cae4';     // 顶面亮青 (受光面)
+    const sideColor = '#0077b6';    // 右侧面深蓝 (背光面)
+    const outlineColor = '#03045e'; // 深蓝描边
+    const roofColor = '#ffc300';    // 黄色顶饰条
 
-    this.ctx.shadowBlur = idx === 999 ? 12 : 3;
-    this.ctx.shadowColor = idx === 999 ? '#00f0ff' : 'rgba(0,0,0,0.15)';
+    this.ctx.strokeStyle = outlineColor;
+    this.ctx.lineWidth = 2;
 
-    this.ctx.fillStyle = baseColor;
-    this.ctx.strokeStyle = '#03045e';
-    this.ctx.lineWidth = 2.5;
+    // 下落中的发光效果
+    if (idx === 999) {
+      this.ctx.shadowBlur = 14;
+      this.ctx.shadowColor = '#00f0ff';
+    }
 
-    // 画主外墙矩形
-    this.drawRoundedRect(x - w / 2, y, w, h, 3);
+    // ======= 第一层：右侧面 (深蓝背光面) =======
+    this.ctx.fillStyle = sideColor;
+    this.ctx.beginPath();
+    this.ctx.moveTo(rx, y);
+    this.ctx.lineTo(rx + sideW, y - depthY);
+    this.ctx.lineTo(rx + sideW, y + h - depthY);
+    this.ctx.lineTo(rx, y + h);
+    this.ctx.closePath();
     this.ctx.fill();
     this.ctx.stroke();
 
-    // 2. 侧边阴影
-    this.ctx.shadowBlur = 0;
-    this.ctx.fillStyle = shadowColor;
-    this.ctx.fillRect(x + w / 2 - 8, y + 1, 7, h - 2);
+    // ======= 第二层：顶面 (亮青受光面) =======
+    this.ctx.fillStyle = topColor;
+    this.ctx.beginPath();
+    this.ctx.moveTo(lx, y);
+    this.ctx.lineTo(lx + depthX, y - depthY);
+    this.ctx.lineTo(rx + depthX, y - depthY);
+    this.ctx.lineTo(rx, y);
+    this.ctx.closePath();
+    this.ctx.fill();
+    this.ctx.stroke();
 
-    // 3. 诺基亚标志性黄色房檐/屋顶饰条
+    // 顶面黄色饰条 (诺基亚标志性黄色屋顶条纹)
     this.ctx.fillStyle = roofColor;
-    this.ctx.strokeStyle = '#03045e';
-    this.ctx.lineWidth = 2;
-    this.ctx.fillRect(x - w / 2 - 2, y - 2, w + 4, 6);
-    this.ctx.strokeRect(x - w / 2 - 2, y - 2, w + 4, 6);
+    this.ctx.beginPath();
+    this.ctx.moveTo(lx, y);
+    this.ctx.lineTo(lx + depthX, y - depthY);
+    this.ctx.lineTo(lx + depthX + 6, y - depthY);
+    this.ctx.lineTo(lx + 6, y);
+    this.ctx.closePath();
+    this.ctx.fill();
 
-    // 4. 双排亮绿/海蓝双窗户 (1:1 匹配诺基亚原版双窗格 layout)
+    // ======= 第三层：正面 (主湖青蓝色面板) =======
+    this.ctx.shadowBlur = 0;
+    this.ctx.fillStyle = frontColor;
+    this.ctx.fillRect(lx, y, w, h);
+    this.ctx.strokeRect(lx, y, w, h);
+
+    // 正面底部微妙渐变暗条 (增加立体层次)
+    const gradFront = this.ctx.createLinearGradient(lx, y, lx, y + h);
+    gradFront.addColorStop(0, 'rgba(255,255,255,0.08)');
+    gradFront.addColorStop(0.5, 'rgba(0,0,0,0)');
+    gradFront.addColorStop(1, 'rgba(0,0,0,0.12)');
+    this.ctx.fillStyle = gradFront;
+    this.ctx.fillRect(lx, y, w, h);
+
+    // 正面黄色顶饰条 (与顶面饰条对齐)
+    this.ctx.fillStyle = roofColor;
+    this.ctx.strokeStyle = outlineColor;
+    this.ctx.lineWidth = 1.5;
+    this.ctx.fillRect(lx - 2, y - 1, w + 4, 5);
+    this.ctx.strokeRect(lx - 2, y - 1, w + 4, 5);
+
+    // ======= 第四层：正面双窗户 (1:1 诺基亚原版双窗格) =======
     const windowW = Math.max(10, Math.floor(w * 0.22));
-    const windowH = Math.max(14, Math.floor(h * 0.48));
-    const wy = y + (h - windowH) / 2 + 1;
+    const windowH = Math.max(14, Math.floor(h * 0.45));
+    const wy = y + (h - windowH) / 2 + 2;
 
     // 左窗户
     this.drawSingleWindow(x - windowW - 3, wy, windowW, windowH, idx);
@@ -1668,14 +1740,14 @@ class TowerBloxxGame {
     this.ctx.restore();
   }
 
-  // 辅助函数：绘制单独的白色窗框和蓝色窗户
+  // 辅助函数：绘制单独的白色窗框与蓝色玻璃 (带 2.5D 高光反射)
   drawSingleWindow(x, y, w, h, animationSeed) {
     // 1. 白色外窗框
     this.ctx.fillStyle = '#ffffff';
     this.ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
     
-    // 2. 蓝色玻璃 (如果是夜间/高处且种子随机契合，窗户透出温暖的橘黄色灯光)
-    let glassColor = '#70a1ff'; // 经典海蓝色玻璃
+    // 2. 蓝色玻璃 (高楼亮灯效果)
+    let glassColor = '#70a1ff';
     if (this.camera.y > 600 && animationSeed % 4 === 0) {
       glassColor = '#ffd166';   // 亮灯的温馨夜窗
     }
@@ -1683,11 +1755,14 @@ class TowerBloxxGame {
     this.ctx.fillStyle = glassColor;
     this.ctx.fillRect(x, y, w, h);
 
-    // 3. 画窗格线 (欧式田字窗格子)
+    // 3. 玻璃高光反射条 (2.5D 光照效果)
+    this.ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    this.ctx.fillRect(x, y, w * 0.35, h);
+
+    // 4. 田字窗格线
     this.ctx.strokeStyle = '#ffffff';
     this.ctx.lineWidth = 1;
     this.ctx.beginPath();
-    // 十字架
     this.ctx.moveTo(x + w / 2, y);
     this.ctx.lineTo(x + w / 2, y + h);
     this.ctx.moveTo(x, y + h / 2);
