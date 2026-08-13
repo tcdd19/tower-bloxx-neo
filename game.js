@@ -1532,25 +1532,29 @@ class TowerBloxxGame {
 
     const altitude = this.camera.y;
 
-    // 我们通过高度插值四个高度段的背景颜色组合
+    // 6 大高度层级自然环境插值 (Park Ground -> Mid Air -> Stratosphere -> Near Orbit -> Deep Space -> Cosmic Nebula)
     let colorTop, colorBottom;
 
-    if (altitude < 500) {
-      const factor = altitude / 500;
+    if (altitude < 400) {
+      const factor = altitude / 400;
       colorTop = this.interpolateColor('#82ccdd', '#60a3bc', factor);
       colorBottom = this.interpolateColor('#fad390', '#f6b93b', factor);
-    } else if (altitude < 1200) {
-      const factor = (altitude - 500) / 700;
-      colorTop = this.interpolateColor('#60a3bc', '#0c2461', factor);
+    } else if (altitude < 1000) {
+      const factor = (altitude - 400) / 600;
+      colorTop = this.interpolateColor('#60a3bc', '#1e3a8a', factor);
       colorBottom = this.interpolateColor('#f6b93b', '#60a3bc', factor);
-    } else if (altitude < 2200) {
-      const factor = (altitude - 1200) / 1000;
-      colorTop = this.interpolateColor('#0c2461', '#0a0d1a', factor);
-      colorBottom = this.interpolateColor('#60a3bc', '#0c2461', factor);
+    } else if (altitude < 1800) {
+      const factor = (altitude - 1000) / 800;
+      colorTop = this.interpolateColor('#1e3a8a', '#0f172a', factor);
+      colorBottom = this.interpolateColor('#60a3bc', '#1e1b4b', factor);
+    } else if (altitude < 3000) {
+      const factor = (altitude - 1800) / 1200;
+      colorTop = this.interpolateColor('#0f172a', '#03071e', factor);
+      colorBottom = this.interpolateColor('#1e1b4b', '#0f172a', factor);
     } else {
-      const factor = Math.min(1.0, (altitude - 2200) / 1500);
-      colorTop = this.interpolateColor('#0a0d1a', '#020205', factor);
-      colorBottom = this.interpolateColor('#0c2461', '#06070c', factor);
+      const factor = Math.min(1.0, (altitude - 3000) / 1500);
+      colorTop = this.interpolateColor('#03071e', '#18002e', factor);
+      colorBottom = this.interpolateColor('#0f172a', '#05020a', factor);
     }
 
     const grad = this.ctx.createLinearGradient(0, 0, 0, this.baseHeight);
@@ -1562,33 +1566,42 @@ class TowerBloxxGame {
 
     this.ctx.save();
     
-    this.drawSpriteWithParallax('bg_flying_whales', this.baseWidth / 2, 4000, 0.05, 2.0);
-    this.drawSpriteWithParallax('space_neptune', 350, 4500, 0.1, 2.0);
-    this.drawSpriteWithParallax('space_saturn', 100, 3500, 0.1, 2.0);
-    this.drawSpriteWithParallax('space_mars', 400, 2500, 0.1, 2.0);
-    this.drawSpriteWithParallax('space_moon', 80, 1800, 0.1, 2.0);
-
-    this.drawSpriteWithParallax('bg_cloud_c', 150, 600, 0.2, 2.5);
-    this.drawSpriteWithParallax('bg_cloud_b', 350, 800, 0.25, 2.5);
-    this.drawSpriteWithParallax('bg_cloud_a', 100, 1000, 0.3, 2.5);
-    
-    if (altitude > 400 && altitude < 1200) {
-      const jetY = this.baseHeight - 800 + altitude * 0.4;
-      const img = this.loader.assets['bg_jet_plane'];
-      if (img && img.complete) {
-        this.ctx.drawImage(img, this.jetX, jetY, 45 * 2.5, 14 * 2.5);
-      }
+    // 【Zone 6: 3200+ 高空深空彩蛋】超高清矢量深空发光神鲸 (Flying Space Whale)
+    if (altitude > 2800) {
+      const whaleY = this.baseHeight - 3800 + altitude * 0.9;
+      this.drawHDVectorSpaceWhale(this.baseWidth / 2, whaleY);
     }
 
-    if (altitude > 200 && altitude < 800) {
-      const propY = this.baseHeight - 500 + altitude * 0.4;
-      const img = this.loader.assets['bg_propeller_plane'];
-      if (img && img.complete) {
-        this.ctx.drawImage(img, this.propX, propY, 103 * 2.5, 9 * 2.5);
-      }
+    // 【Zone 5: 2200 ~ 3500 高空行星】超高清矢量海王星与 3D 光环土星
+    if (altitude > 1800) {
+      const nepY = this.baseHeight - 4200 + altitude * 0.85;
+      this.drawHDVectorNeptune(350, nepY, 28);
+
+      const satY = this.baseHeight - 3200 + altitude * 0.85;
+      this.drawHDVectorSaturn(110, satY, 32);
     }
 
-    // 远景 HD 2.5D 现代摩天大楼剪影 (100% 矢量超高清重绘替代 59x12 马赛克老图)
+    // 【Zone 4: 1400 ~ 2400 近地轨道】超高清矢量月球与火星
+    if (altitude > 1000) {
+      const marsY = this.baseHeight - 2400 + altitude * 0.8;
+      this.drawHDVectorMars(390, marsY, 26);
+
+      const moonY = this.baseHeight - 1700 + altitude * 0.8;
+      this.drawHDVectorMoon(85, moonY, 38);
+    }
+
+    // 【Zone 2: 300 ~ 1200 城市高空区】超高清矢量喷气客机与复古双翼飞机
+    if (altitude > 400 && altitude < 1400) {
+      const jetY = this.baseHeight - 850 + altitude * 0.45;
+      this.drawHDVectorJet(this.jetX, jetY);
+    }
+
+    if (altitude > 150 && altitude < 900) {
+      const propY = this.baseHeight - 520 + altitude * 0.45;
+      this.drawHDVectorBiplane(this.propX, propY);
+    }
+
+    // 【Zone 1: 0 ~ 300 地表远景天际线】远景 HD 2.5D 现代摩天大楼剪影
     if (altitude < 1200) {
       const skylineY = this.baseHeight - 120 + altitude * 0.25;
       
@@ -1616,6 +1629,300 @@ class TowerBloxxGame {
       }
       this.ctx.restore();
     }
+
+    this.ctx.restore();
+  }
+
+  // 100% 超高清矢量绘图组件集 (替代原本老旧像素图片)
+  drawHDVectorMoon(x, y, radius) {
+    this.ctx.save();
+    // 大气微光 halo
+    const haloGrad = this.ctx.createRadialGradient(x, y, radius * 0.8, x, y, radius * 1.6);
+    haloGrad.addColorStop(0, 'rgba(186, 230, 253, 0.4)');
+    haloGrad.addColorStop(1, 'rgba(186, 230, 253, 0)');
+    this.ctx.fillStyle = haloGrad;
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, radius * 1.6, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 月球灰白渐变主面
+    const moonGrad = this.ctx.createRadialGradient(x - radius * 0.3, y - radius * 0.3, radius * 0.2, x, y, radius);
+    moonGrad.addColorStop(0, '#f8fafc');
+    moonGrad.addColorStop(0.6, '#cbd5e1');
+    moonGrad.addColorStop(1, '#64748b');
+    this.ctx.fillStyle = moonGrad;
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 灰白色环形山陨石坑 (Craters)
+    this.ctx.fillStyle = 'rgba(100, 116, 139, 0.35)';
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+    this.ctx.lineWidth = 1;
+    const craters = [
+      { cx: -0.3, cy: -0.2, r: 0.22 },
+      { cx: 0.2, cy: 0.3, r: 0.18 },
+      { cx: 0.35, cy: -0.25, r: 0.14 },
+      { cx: -0.1, cy: 0.4, r: 0.16 }
+    ];
+    craters.forEach(c => {
+      const cx = x + c.cx * radius;
+      const cy = y + c.cy * radius;
+      const cr = c.r * radius;
+      this.ctx.beginPath();
+      this.ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.stroke();
+    });
+
+    this.ctx.restore();
+  }
+
+  drawHDVectorMars(x, y, radius) {
+    this.ctx.save();
+    // 赤红火星大气暗红微光
+    const haloGrad = this.ctx.createRadialGradient(x, y, radius * 0.8, x, y, radius * 1.5);
+    haloGrad.addColorStop(0, 'rgba(239, 68, 68, 0.35)');
+    haloGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
+    this.ctx.fillStyle = haloGrad;
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, radius * 1.5, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 火星赤红沙丘球体
+    const marsGrad = this.ctx.createRadialGradient(x - radius * 0.3, y - radius * 0.3, radius * 0.2, x, y, radius);
+    marsGrad.addColorStop(0, '#fca5a5');
+    marsGrad.addColorStop(0.5, '#ef4444');
+    marsGrad.addColorStop(1, '#991b1b');
+    this.ctx.fillStyle = marsGrad;
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 北极白色极帽 (Polar Ice Cap)
+    this.ctx.fillStyle = 'rgba(254, 242, 242, 0.85)';
+    this.ctx.beginPath();
+    this.ctx.arc(x, y - radius * 0.7, radius * 0.35, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    this.ctx.restore();
+  }
+
+  drawHDVectorSaturn(x, y, radius) {
+    this.ctx.save();
+    this.ctx.translate(x, y);
+    this.ctx.rotate(-0.35);
+
+    // 1. 环后侧半圈
+    this.ctx.strokeStyle = 'rgba(253, 224, 71, 0.55)';
+    this.ctx.lineWidth = 14;
+    this.ctx.beginPath();
+    this.ctx.ellipse(0, 0, radius * 2.2, radius * 0.55, 0, Math.PI, Math.PI * 2);
+    this.ctx.stroke();
+
+    // 2. 土星金黄条纹球体
+    const saturnGrad = this.ctx.createLinearGradient(0, -radius, 0, radius);
+    saturnGrad.addColorStop(0, '#fef08a');
+    saturnGrad.addColorStop(0.4, '#f59e0b');
+    saturnGrad.addColorStop(0.7, '#d97706');
+    saturnGrad.addColorStop(1, '#78350f');
+    this.ctx.fillStyle = saturnGrad;
+    this.ctx.beginPath();
+    this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 3. 环前侧半圈
+    this.ctx.strokeStyle = 'rgba(254, 240, 138, 0.85)';
+    this.ctx.lineWidth = 14;
+    this.ctx.beginPath();
+    this.ctx.ellipse(0, 0, radius * 2.2, radius * 0.55, 0, 0, Math.PI);
+    this.ctx.stroke();
+
+    // 4. 细分绚丽光环外边线
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.ellipse(0, 0, radius * 2.4, radius * 0.6, 0, 0, Math.PI * 2);
+    this.ctx.stroke();
+
+    this.ctx.restore();
+  }
+
+  drawHDVectorNeptune(x, y, radius) {
+    this.ctx.save();
+    // 冰蓝光晕
+    const haloGrad = this.ctx.createRadialGradient(x, y, radius * 0.8, x, y, radius * 1.5);
+    haloGrad.addColorStop(0, 'rgba(56, 189, 248, 0.45)');
+    haloGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    this.ctx.fillStyle = haloGrad;
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, radius * 1.5, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 海王星冰蓝球体
+    const nepGrad = this.ctx.createRadialGradient(x - radius * 0.3, y - radius * 0.3, radius * 0.2, x, y, radius);
+    nepGrad.addColorStop(0, '#7dd3fc');
+    nepGrad.addColorStop(0.5, '#0284c7');
+    nepGrad.addColorStop(1, '#0369a1');
+    this.ctx.fillStyle = nepGrad;
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 甲烷云带 (White Methane Bands)
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    this.ctx.lineWidth = 3;
+    this.ctx.beginPath();
+    this.ctx.ellipse(x, y - radius * 0.2, radius * 0.85, radius * 0.2, 0.1, 0, Math.PI * 2);
+    this.ctx.stroke();
+
+    this.ctx.restore();
+  }
+
+  drawHDVectorJet(x, y) {
+    this.ctx.save();
+    this.ctx.translate(x, y);
+
+    // 引擎双重白色凝结水汽尾迹 (Twin Vapor Contrails)
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    this.ctx.lineWidth = 2.5;
+    this.ctx.beginPath();
+    this.ctx.moveTo(-10, -4); this.ctx.lineTo(-140, -6);
+    this.ctx.moveTo(-10, 4);  this.ctx.lineTo(-140, 6);
+    this.ctx.stroke();
+
+    // 银白超音速客机机身
+    const fuselageGrad = this.ctx.createLinearGradient(0, -6, 0, 6);
+    fuselageGrad.addColorStop(0, '#ffffff');
+    fuselageGrad.addColorStop(0.5, '#e2e8f0');
+    fuselageGrad.addColorStop(1, '#94a3b8');
+    this.ctx.fillStyle = fuselageGrad;
+    this.ctx.strokeStyle = '#334155';
+    this.ctx.lineWidth = 1;
+
+    // 机头与机身 Path
+    this.ctx.beginPath();
+    this.ctx.moveTo(35, 0); // 机尖
+    this.ctx.bezierCurveTo(20, -5, -20, -5, -30, -4);
+    this.ctx.lineTo(-30, 4);
+    this.ctx.bezierCurveTo(-20, 5, 20, 5, 35, 0);
+    this.ctx.closePath();
+    this.ctx.fill();
+    this.ctx.stroke();
+
+    // 后掠大后掠机翼 (Delta Wings)
+    this.ctx.fillStyle = '#cbd5e1';
+    this.ctx.beginPath();
+    this.ctx.moveTo(5, -4);
+    this.ctx.lineTo(-18, -26);
+    this.ctx.lineTo(-24, -4);
+    this.ctx.closePath();
+    this.ctx.fill();
+    this.ctx.stroke();
+
+    this.ctx.beginPath();
+    this.ctx.moveTo(5, 4);
+    this.ctx.lineTo(-18, 26);
+    this.ctx.lineTo(-24, 4);
+    this.ctx.closePath();
+    this.ctx.fill();
+    this.ctx.stroke();
+
+    // 尾翼 (Tail Fin)
+    this.ctx.fillStyle = '#ef4444';
+    this.ctx.beginPath();
+    this.ctx.moveTo(-22, -4);
+    this.ctx.lineTo(-32, -16);
+    this.ctx.lineTo(-30, -4);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    this.ctx.restore();
+  }
+
+  drawHDVectorBiplane(x, y) {
+    this.ctx.save();
+    this.ctx.translate(x, y);
+
+    // 拖尾醒目彩旗 (Trailing Celebration Banner)
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+    this.ctx.lineWidth = 1;
+    this.ctx.beginPath();
+    this.ctx.moveTo(-25, 0);
+    this.ctx.lineTo(-40, 0);
+    this.ctx.stroke();
+
+    // 欢庆横幅
+    const bannerGrad = this.ctx.createLinearGradient(-110, -10, -40, 10);
+    bannerGrad.addColorStop(0, '#f59e0b');
+    bannerGrad.addColorStop(1, '#ef4444');
+    this.ctx.fillStyle = bannerGrad;
+    this.ctx.fillRect(-110, -10, 70, 20);
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.font = 'bold 9px sans-serif';
+    this.ctx.fillText('TOWER BLOXX', -105, 4);
+
+    // 复古黄色双翼机机身
+    this.ctx.fillStyle = '#facc15';
+    this.ctx.strokeStyle = '#713f12';
+    this.ctx.lineWidth = 1.2;
+
+    this.ctx.fillRect(-22, -5, 40, 10);
+    
+    // 上下双层翅膀 (Biplane Wings)
+    this.ctx.fillStyle = '#eab308';
+    this.ctx.fillRect(-8, -18, 20, 5);
+    this.ctx.fillRect(-8, 13, 20, 5);
+
+    // 旋转螺旋桨虚化光盘 (Rotating Propeller Blur)
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+    this.ctx.beginPath();
+    this.ctx.ellipse(20, 0, 3, 16, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    this.ctx.restore();
+  }
+
+  drawHDVectorSpaceWhale(x, y) {
+    this.ctx.save();
+    this.ctx.translate(x, y);
+
+    // 星空巨鲸流光紫气 (Celestial Glow Halo)
+    const whaleGrad = this.ctx.createRadialGradient(0, 0, 20, 0, 0, 70);
+    whaleGrad.addColorStop(0, 'rgba(168, 85, 247, 0.45)');
+    whaleGrad.addColorStop(1, 'rgba(168, 85, 247, 0)');
+    this.ctx.fillStyle = whaleGrad;
+    this.ctx.beginPath();
+    this.ctx.arc(0, 0, 70, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 巨鲸紫罗兰流线型身躯 (Flying Space Whale Body)
+    const bodyGrad = this.ctx.createLinearGradient(-60, 0, 60, 0);
+    bodyGrad.addColorStop(0, '#3b0764');
+    bodyGrad.addColorStop(0.5, '#7e22ce');
+    bodyGrad.addColorStop(1, '#a855f7');
+    this.ctx.fillStyle = bodyGrad;
+    this.ctx.strokeStyle = '#e9d5ff';
+    this.ctx.lineWidth = 1.5;
+
+    this.ctx.beginPath();
+    this.ctx.moveTo(60, 0);
+    this.ctx.bezierCurveTo(40, -25, -20, -25, -50, -5);
+    this.ctx.bezierCurveTo(-70, -20, -85, -15, -95, 0);
+    this.ctx.bezierCurveTo(-85, 15, -70, 20, -50, 5);
+    this.ctx.bezierCurveTo(-20, 25, 40, 25, 60, 0);
+    this.ctx.closePath();
+    this.ctx.fill();
+    this.ctx.stroke();
+
+    // 鲸腹星光嵌点 (Constellation Stars on Body)
+    this.ctx.fillStyle = '#ffffff';
+    const starsOnWhale = [{x: 25, y: -4}, {x: 0, y: 6}, {x: -25, y: -2}, {x: -45, y: 3}];
+    starsOnWhale.forEach(st => {
+      this.ctx.beginPath();
+      this.ctx.arc(st.x, st.y, 2, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
 
     this.ctx.restore();
   }
