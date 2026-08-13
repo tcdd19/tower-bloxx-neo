@@ -186,12 +186,12 @@ class GoldReinforceEffect {
 
 // 居民降落伞入住特效类 (从空中飘落降落至新建造楼层窗户)
 class ResidentParachute {
-  constructor(startX, startY, targetX, targetY) {
+  constructor(startX, startY, targetBlockIndex, offsetX = 0) {
     this.x = startX;
     this.y = startY;
-    this.targetX = targetX;
-    this.targetY = targetY;
-    this.vy = 1.6 + Math.random() * 0.8;
+    this.targetBlockIndex = targetBlockIndex; // 绑定的目标楼层索引
+    this.offsetX = offsetX;                   // 房顶中心的左右分布微调 (-12px ~ +12px)
+    this.vy = 2.0 + Math.random() * 0.8;
     this.time = Math.random() * 10;
     this.state = 'FLOATING'; // FLOATING -> LANDED
     this.active = true;
@@ -203,13 +203,28 @@ class ResidentParachute {
     this.time += dt * 0.003;
     const dtFactor = Math.min(dt / 16.66, 3.0);
 
+    // 获取绑定的目标楼层实时坐标 (100% 精准追踪镜头与楼体摇摆)
+    const groundY = game.baseHeight - 120;
+    let targetX = game.baseWidth / 2 + this.offsetX;
+    let targetWorldY = (this.targetBlockIndex + 1) * game.blockHeight;
+
+    if (game.tower && game.tower[this.targetBlockIndex]) {
+      const block = game.tower[this.targetBlockIndex];
+      const swayFactor = Math.pow((this.targetBlockIndex + 1) / Math.max(1, game.tower.length), 1.5);
+      targetX = block.x + game.towerSway.offset * swayFactor + this.offsetX;
+      targetWorldY = (this.targetBlockIndex + 1) * block.h;
+    }
+
+    const currentTargetScreenY = groundY - targetWorldY + game.camera.y - 4;
+
     if (this.state === 'FLOATING') {
       this.y += this.vy * dtFactor;
-      // 随风左右平滑飘动
-      this.x += Math.sin(this.time * 2.5) * 0.85 * dtFactor;
+      // 向房子正中间平滑集中靠拢
+      this.x += (targetX - this.x) * 0.08 * dtFactor;
 
-      if (this.y >= this.targetY) {
-        this.y = this.targetY;
+      if (this.y >= currentTargetScreenY) {
+        this.y = currentTargetScreenY;
+        this.x = targetX;
         this.state = 'LANDED';
         this.cheerTimer = 0;
         if (game) {
@@ -220,6 +235,10 @@ class ResidentParachute {
         }
       }
     } else if (this.state === 'LANDED') {
+      // 降落后完美粘附在房子顶面窗户，随镜头与楼体完全联动！
+      this.x = targetX;
+      this.y = currentTargetScreenY;
+
       this.cheerTimer += dt;
       if (this.cheerTimer > 650) {
         this.active = false;
@@ -1249,14 +1268,20 @@ class TowerBloxxGame {
     // A4: 帧率无关物理缩放因子
     const dtFactor = Math.min(dt / 16.666, 3.0);
 
-    // E2: GAMEOVER 楼体坍塌物理更新
-    if (this.state === 'GAMEOVER' && this.collapseBlocks.length > 0) {
-      this.collapseBlocks.forEach(b => {
+    // 楼体方块自由落体翻滚物理更新 (包括放偏失误与砸毁楼层，翻滚坠出屏幕下边缘销毁)
+    if (this.collapseBlocks.length > 0) {
+      for (let i = this.collapseBlocks.length - 1; i >= 0; i--) {
+        const b = this.collapseBlocks[i];
         b.x += b.vx * dtFactor;
         b.y += b.vy * dtFactor;
-        b.vy += 0.4 * dtFactor; // 重力加速度
-        b.rot += b.vRot * dtFactor;
-      });
+        b.vy += 0.45 * dtFactor; // 真实重力加速度
+        b.rot += (b.vRot || b.vr || 0.15) * dtFactor;
+
+        // 翻滚坠出屏幕下方 200px 后安全销毁
+        if (b.y > this.baseHeight + 200) {
+          this.collapseBlocks.splice(i, 1);
+        }
+      }
     }
 
     // 1. 粒子物理更新
@@ -1383,6 +1408,21 @@ class TowerBloxxGame {
     if (this.tower.length > 0) {
       const maxOffset = landing.w * 0.8;
       if (Math.abs(dx) >= maxOffset) {
+        const groundY = this.baseHeight - 120;
+        const landingScreenY = groundY - landing.y + this.camera.y;
+
+        // 产生放偏失误直接翻滚坠落出屏幕下边缘的物理方块 (画面连贯性极强!)
+        this.collapseBlocks.push({
+          x: landing.x,
+          y: landingScreenY,
+          w: landing.w,
+          h: landing.h,
+          vx: dx > 0 ? 6.5 : -6.5,
+          vy: -3,
+          rot: 0,
+          vr: dx > 0 ? 0.2 : -0.2
+        });
+
         this.loseLife("方块没有对准，直接从楼顶坠落了！");
         return;
       }
@@ -1445,6 +1485,18 @@ class TowerBloxxGame {
 
       // 歪楼砸倒判定 (严重偏移时砸毁顶层 1-3 层楼房)
       if (this.tower.length > 0 && Math.abs(dx) > landing.w * 0.52) {
+        // 本次下落的楼块翻滚坠落
+        this.collapseBlocks.push({
+          x: landing.x,
+          y: landingScreenY,
+          w: landing.w,
+          h: landing.h,
+          vx: dx > 0 ? 8 : -8,
+          vy: -4,
+          rot: 0,
+          vr: dx > 0 ? 0.25 : -0.25
+        });
+
         this.loseLife("房子撞击严重，导致顶楼崩塌！");
         
         // 随机砸毁 1~3 层已盖好的楼层！
@@ -1455,7 +1507,7 @@ class TowerBloxxGame {
             // 产生砸碎的楼层崩塌碎片
             this.collapseBlocks.push({
               x: removed.x,
-              y: this.baseHeight - 120 - removed.y + this.camera.y,
+              y: groundY - removed.y + this.camera.y,
               w: removed.w,
               h: removed.h,
               vx: (Math.random() - 0.5) * 12 + (dx > 0 ? 8 : -8),
@@ -1481,14 +1533,14 @@ class TowerBloxxGame {
     }
     this.spriteEffects.push(new SpriteDustPuff(landing.x, landingScreenY, 2.5));
 
-    // 触发居民降落伞入住动画 (3 ~ 5 名彩虹降落伞小居民飘落降落至窗户)
+    // 触发居民降落伞入住动画 (3 ~ 5 名彩虹降落伞小居民 100% 精准飘落至新房顶中心)
+    const targetBlockIndex = this.tower.length;
     const resCount = isPerfect ? 5 : 3;
     for (let r = 0; r < resCount; r++) {
-      const startX = landing.x + (r - (resCount - 1) / 2) * 18 + (Math.random() - 0.5) * 12;
-      const startY = landingScreenY - 140 - Math.random() * 40;
-      const targetX = landing.x + (r - (resCount - 1) / 2) * 16;
-      const targetY = landingScreenY - landing.h * 0.2;
-      this.spriteEffects.push(new ResidentParachute(startX, startY, targetX, targetY));
+      const offsetX = (r - (resCount - 1) / 2) * 12; // 集中分布在屋顶中心 +/-12px
+      const startX = landing.x + offsetX + (Math.random() - 0.5) * 8;
+      const startY = landingScreenY - 150 - Math.random() * 30;
+      this.spriteEffects.push(new ResidentParachute(startX, startY, targetBlockIndex, offsetX));
     }
 
     // E4: 居民增加
