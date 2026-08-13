@@ -184,6 +184,104 @@ class GoldReinforceEffect {
   }
 }
 
+// 居民降落伞入住特效类 (从空中飘落降落至新建造楼层窗户)
+class ResidentParachute {
+  constructor(startX, startY, targetX, targetY) {
+    this.x = startX;
+    this.y = startY;
+    this.targetX = targetX;
+    this.targetY = targetY;
+    this.vy = 1.6 + Math.random() * 0.8;
+    this.time = Math.random() * 10;
+    this.state = 'FLOATING'; // FLOATING -> LANDED
+    this.active = true;
+    this.cheerTimer = 0;
+  }
+
+  update(dt, game) {
+    if (!this.active) return;
+    this.time += dt * 0.003;
+    const dtFactor = Math.min(dt / 16.66, 3.0);
+
+    if (this.state === 'FLOATING') {
+      this.y += this.vy * dtFactor;
+      // 随风左右平滑飘动
+      this.x += Math.sin(this.time * 2.5) * 0.85 * dtFactor;
+
+      if (this.y >= this.targetY) {
+        this.y = this.targetY;
+        this.state = 'LANDED';
+        this.cheerTimer = 0;
+        if (game) {
+          game.population += 15;
+          if (game.dom && game.dom.populationVal) {
+            game.dom.populationVal.textContent = game.population;
+          }
+        }
+      }
+    } else if (this.state === 'LANDED') {
+      this.cheerTimer += dt;
+      if (this.cheerTimer > 650) {
+        this.active = false;
+      }
+    }
+  }
+
+  draw(ctx, loader) {
+    if (!this.active) return;
+    const img = loader ? loader.assets['sprite_residents'] : null;
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+
+    if (this.state === 'FLOATING') {
+      const sway = Math.sin(this.time * 3) * 0.15;
+      ctx.rotate(sway);
+
+      // 彩虹半圆降落伞
+      const chuteGrad = ctx.createLinearGradient(-15, -24, 15, -24);
+      chuteGrad.addColorStop(0, '#ef4444');
+      chuteGrad.addColorStop(0.33, '#f59e0b');
+      chuteGrad.addColorStop(0.66, '#10b981');
+      chuteGrad.addColorStop(1, '#3b82f6');
+      ctx.fillStyle = chuteGrad;
+      ctx.beginPath();
+      ctx.arc(0, -18, 15, Math.PI, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      // 降落伞挂绳
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(-14, -18); ctx.lineTo(0, -4);
+      ctx.moveTo(0, -18);   ctx.lineTo(0, -4);
+      ctx.moveTo(14, -18);  ctx.lineTo(0, -4);
+      ctx.stroke();
+
+      // 降落伞挂着的小居民
+      if (img && img.complete) {
+        ctx.drawImage(img, 0, 0, 23, 28, -11, -4, 22, 26);
+      } else {
+        ctx.fillStyle = '#f59e0b';
+        ctx.beginPath();
+        ctx.arc(0, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (this.state === 'LANDED') {
+      // 成功降落窗户欢呼动作
+      if (img && img.complete) {
+        ctx.drawImage(img, 23, 0, 23, 28, -11, -14, 22, 26);
+      }
+    }
+
+    ctx.restore();
+  }
+}
+
 // ==========================================================================
 // 1. 音效合成系统 (Web Audio API)
 // ==========================================================================
@@ -1048,7 +1146,7 @@ class TowerBloxxGame {
     // 1. 粒子物理更新
     this.particles.update();
     for (let i = this.spriteEffects.length - 1; i >= 0; i--) {
-      this.spriteEffects[i].update(dt);
+      this.spriteEffects[i].update(dt, this);
       if (!this.spriteEffects[i].active) {
         this.spriteEffects.splice(i, 1);
       }
@@ -1229,9 +1327,35 @@ class TowerBloxxGame {
       const particleColor = this.theme === 'retro' ? '#306230' : '#d2dae2';
       this.particles.emit(landing.x, landingScreenY, particleColor, 10, this.theme === 'retro');
 
-      // 歪楼扣血判定 (第一层地基不扣血)
-      if (this.tower.length > 0 && Math.abs(dx) > landing.w * 0.55) {
-        this.loseLife("房子歪的太厉害，楼体剧烈颤动！");
+      // 歪楼砸倒判定 (严重偏移时砸毁顶层 1-3 层楼房)
+      if (this.tower.length > 0 && Math.abs(dx) > landing.w * 0.52) {
+        this.loseLife("房子撞击严重，导致顶楼崩塌！");
+        
+        // 随机砸毁 1~3 层已盖好的楼层！
+        const smashCount = Math.min(this.tower.length, Math.floor(Math.random() * 3) + 1);
+        for (let s = 0; s < smashCount; s++) {
+          const removed = this.tower.pop();
+          if (removed) {
+            // 产生砸碎的楼层崩塌碎片
+            this.collapseBlocks.push({
+              x: removed.x,
+              y: this.baseHeight - 120 - removed.y + this.camera.y,
+              w: removed.w,
+              h: removed.h,
+              vx: (Math.random() - 0.5) * 12 + (dx > 0 ? 8 : -8),
+              vy: -4 - Math.random() * 5,
+              rot: 0,
+              vr: (Math.random() - 0.5) * 0.35
+            });
+          }
+        }
+        
+        // 剧烈砸楼震屏与爆炸粒子烟尘
+        this.triggerShake(16, 25);
+        this.particles.emit(landing.x, landingScreenY, '#ef4444', 35, this.theme === 'retro');
+        this.particles.emitDust(landing.x, landingScreenY, '#64748b', this.theme === 'retro');
+        this.floatingTexts.push(new FloatingText(landing.x, landingScreenY - 30, `砸毁 ${smashCount} 层楼!`, '#ef4444', true));
+        return;
       }
     }
 
@@ -1241,8 +1365,18 @@ class TowerBloxxGame {
     }
     this.spriteEffects.push(new SpriteDustPuff(landing.x, landingScreenY, 2.5));
 
+    // 触发居民降落伞入住动画 (3 ~ 5 名彩虹降落伞小居民飘落降落至窗户)
+    const resCount = isPerfect ? 5 : 3;
+    for (let r = 0; r < resCount; r++) {
+      const startX = landing.x + (r - (resCount - 1) / 2) * 18 + (Math.random() - 0.5) * 12;
+      const startY = landingScreenY - 140 - Math.random() * 40;
+      const targetX = landing.x + (r - (resCount - 1) / 2) * 16;
+      const targetY = landingScreenY - landing.h * 0.2;
+      this.spriteEffects.push(new ResidentParachute(startX, startY, targetX, targetY));
+    }
+
     // E4: 居民增加
-    const popAdd = Math.floor(Math.random() * 50) + 30;
+    const popAdd = (isPerfect ? 80 : 40) + Math.floor(Math.random() * 20);
     this.population += popAdd;
     this.triggerShake(5, 10); // 落地打压震屏
     
@@ -1320,6 +1454,9 @@ class TowerBloxxGame {
 
     // 8. 绘制 Combo 漂浮文字
     this.floatingTexts.forEach(txt => txt.draw(this.ctx, 'Share Tech Mono', 'Outfit'));
+
+    // 9. 绘制左下角原版风格楼层进度与居民数仪表盘
+    this.drawBottomLeftHUD();
 
     // 9. 游戏结束成就徽章
     if (this.state === 'GAMEOVER') {
@@ -1443,35 +1580,168 @@ class TowerBloxxGame {
     return `rgb(${Math.round(r1+(r2-r1)*factor)},${Math.round(g1+(g2-g1)*factor)},${Math.round(b1+(b2-b1)*factor)})`;
   }
 
+  // 绘制左下角原版风格楼层目标进度与居民数仪表盘
+  drawBottomLeftHUD() {
+    if (this.state !== 'PLAYING') return;
+
+    this.ctx.save();
+    
+    const panelX = 14;
+    const panelY = this.baseHeight - 210;
+    const panelW = 90;
+    const panelH = 185;
+
+    // 1. 半透明毛玻璃暗色容器底座
+    this.ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
+    this.ctx.strokeStyle = '#38bdf8';
+    this.ctx.lineWidth = 1.5;
+    this.drawRoundedRect(panelX, panelY, panelW, panelH, 10);
+    this.ctx.fill();
+    this.ctx.stroke();
+
+    // 2. 顶端“楼层”标识
+    this.ctx.fillStyle = '#94a3b8';
+    this.ctx.font = 'bold 10px monospace';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText('TARGET 50F', panelX + panelW / 2, panelY + 16);
+
+    // 3. 立体高度进度条槽
+    const meterX = panelX + 16;
+    const meterY = panelY + 26;
+    const meterW = 12;
+    const meterH = 110;
+
+    this.ctx.fillStyle = '#0f172a';
+    this.ctx.strokeStyle = '#334155';
+    this.ctx.lineWidth = 1;
+    this.drawRoundedRect(meterX, meterY, meterW, meterH, 6);
+    this.ctx.fill();
+    this.ctx.stroke();
+
+    // 充能发光刻度条
+    const progress = Math.min(1.0, this.tower.length / 50);
+    const fillH = meterH * progress;
+    if (fillH > 0) {
+      const fillGrad = this.ctx.createLinearGradient(0, meterY + meterH, 0, meterY);
+      fillGrad.addColorStop(0, '#38bdf8');
+      fillGrad.addColorStop(0.7, '#ffd166');
+      fillGrad.addColorStop(1, '#ef4444');
+
+      this.ctx.fillStyle = fillGrad;
+      this.drawRoundedRect(meterX + 1.5, meterY + meterH - fillH + 1.5, meterW - 3, Math.max(3, fillH - 3), 4);
+      this.ctx.fill();
+    }
+
+    // 右侧数值标签
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.font = 'bold 16px sans-serif';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText(`${this.tower.length}`, panelX + 36, panelY + 50);
+
+    this.ctx.fillStyle = '#cbd5e1';
+    this.ctx.font = '10px sans-serif';
+    this.ctx.fillText('/50 层', panelX + 36, panelY + 66);
+
+    // 4. 底部居民人数小图标 + 人数数值
+    this.ctx.strokeStyle = '#334155';
+    this.ctx.lineWidth = 1;
+    this.ctx.beginPath();
+    this.ctx.moveTo(panelX + 8, panelY + 145);
+    this.ctx.lineTo(panelX + panelW - 8, panelY + 145);
+    this.ctx.stroke();
+
+    // 人员图标 (使用解压出的 ui_population_icon 或矢量小人)
+    const popImg = this.loader.assets['ui_population_icon'];
+    if (popImg && popImg.complete) {
+      this.ctx.drawImage(popImg, panelX + 12, panelY + 152, 10, 24);
+    } else {
+      this.ctx.fillStyle = '#fbbf24';
+      this.ctx.beginPath();
+      this.ctx.arc(panelX + 16, panelY + 158, 4, 0, Math.PI * 2);
+      this.ctx.fill();
+    }
+
+    this.ctx.fillStyle = '#ffd166';
+    this.ctx.font = 'bold 12px monospace';
+    this.ctx.textAlign = 'left';
+    this.ctx.fillText(`${this.population}`, panelX + 28, panelY + 168);
+
+    this.ctx.restore();
+  }
+
+  // 100% 超高清矢量北欧公园地表元素绘制 (剔除旧版低分辨率贴图)
   drawParkSilhouettes() {
     if (this.theme === 'retro') return;
 
     const scrollY = this.camera.y;
-    if (scrollY > this.baseHeight + 50) return;
+    if (scrollY > this.baseHeight + 100) return;
 
     this.ctx.save();
     const alpha = Math.max(0, 1.0 - scrollY / 450);
     this.ctx.globalAlpha = alpha;
 
     const groundY = this.baseHeight - 120;
-    const drawY = groundY + scrollY; 
+    const drawY = groundY + scrollY;
 
-    const fenceImg = this.loader.assets['bg_fence'];
-    if (fenceImg && fenceImg.complete) {
-      const fW = 33 * 2.5;
-      const fH = 34 * 2.5;
-      for (let x = 0; x < this.baseWidth; x += fW) {
-        this.ctx.drawImage(fenceImg, x, drawY - fH, fW, fH);
-      }
+    // 1. HD 现代金属公园护栏
+    this.ctx.strokeStyle = '#475569';
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.moveTo(0, drawY - 18);
+    this.ctx.lineTo(this.baseWidth, drawY - 18);
+    this.ctx.moveTo(0, drawY - 6);
+    this.ctx.lineTo(this.baseWidth, drawY - 6);
+    for (let x = 10; x < this.baseWidth; x += 18) {
+      this.ctx.moveTo(x, drawY - 24);
+      this.ctx.lineTo(x, drawY);
     }
+    this.ctx.stroke();
 
-    const treeImg = this.loader.assets['bg_tree'];
-    if (treeImg && treeImg.complete) {
-      const tW = 51 * 2.5;
-      const tH = 48 * 2.5;
-      this.parkTrees.forEach(tree => {
-        this.ctx.drawImage(treeImg, tree.x - tW/2, drawY - tH + 5, tW, tH);
-      });
+    // 2. HD 矢量多重北欧冷空松树 (清晰精致层叠)
+    this.parkTrees.forEach(tree => {
+      const tx = tree.x;
+      const ty = drawY;
+
+      // 树干
+      this.ctx.fillStyle = '#331800';
+      this.ctx.fillRect(tx - 3, ty - 45, 6, 45);
+
+      // 树冠层叠渐变绿 (超高清矢量松树)
+      const treeGrad = this.ctx.createLinearGradient(tx - 25, ty - 85, tx + 25, ty - 20);
+      treeGrad.addColorStop(0, '#52b788');
+      treeGrad.addColorStop(0.5, '#2d6a4f');
+      treeGrad.addColorStop(1, '#1b4332');
+      this.ctx.fillStyle = treeGrad;
+
+      this.ctx.beginPath();
+      // 上中下三层锥形树冠
+      this.ctx.moveTo(tx, ty - 90); this.ctx.lineTo(tx - 15, ty - 65); this.ctx.lineTo(tx + 15, ty - 65); this.ctx.closePath(); this.ctx.fill();
+      this.ctx.beginPath();
+      this.ctx.moveTo(tx, ty - 75); this.ctx.lineTo(tx - 22, ty - 45); this.ctx.lineTo(tx + 22, ty - 45); this.ctx.closePath(); this.ctx.fill();
+      this.ctx.beginPath();
+      this.ctx.moveTo(tx, ty - 55); this.ctx.lineTo(tx - 28, ty - 25); this.ctx.lineTo(tx + 28, ty - 25); this.ctx.closePath(); this.ctx.fill();
+    });
+
+    // 3. HD 暖黄街灯 (英伦风灯光晕)
+    for (let lx = 60; lx < this.baseWidth; lx += 180) {
+      // 街灯杆
+      this.ctx.fillStyle = '#1e293b';
+      this.ctx.fillRect(lx - 2, drawY - 55, 4, 55);
+      
+      // 灯罩
+      this.ctx.fillStyle = '#fbbf24';
+      this.ctx.beginPath();
+      this.ctx.arc(lx, drawY - 55, 6, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      // 暖黄色光晕
+      const haloGrad = this.ctx.createRadialGradient(lx, drawY - 55, 1, lx, drawY - 55, 25);
+      haloGrad.addColorStop(0, 'rgba(254, 240, 138, 0.45)');
+      haloGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+      this.ctx.fillStyle = haloGrad;
+      this.ctx.beginPath();
+      this.ctx.arc(lx, drawY - 55, 25, 0, Math.PI * 2);
+      this.ctx.fill();
     }
 
     this.ctx.restore();
@@ -1940,13 +2210,22 @@ class TowerBloxxGame {
       }
     }
 
-    // 2. 主悬挂钢索 (精确接到吊钩顶部滑轮套件)
+    // 2. 主悬挂高强度重工业钢索 (4.0px 加粗粗缆绳 + 1.2px 钢芯高光，完美匹配吊钩)
     this.ctx.strokeStyle = isRetro ? '#0f380f' : '#0f172a';
-    this.ctx.lineWidth = isRetro ? 3.5 : 2.5;
+    this.ctx.lineWidth = isRetro ? 4.5 : 4.0;
     this.ctx.beginPath();
     this.ctx.moveTo(trolleyX, this.crane.pivotY - 15);
-    this.ctx.lineTo(swingX, swingY - 22);
+    this.ctx.lineTo(swingX, swingY - 18);
     this.ctx.stroke();
+
+    if (!isRetro) {
+      this.ctx.strokeStyle = '#475569';
+      this.ctx.lineWidth = 1.2;
+      this.ctx.beginPath();
+      this.ctx.moveTo(trolleyX, this.crane.pivotY - 15);
+      this.ctx.lineTo(swingX, swingY - 18);
+      this.ctx.stroke();
+    }
 
     this.ctx.restore();
 
@@ -2028,6 +2307,7 @@ class TowerBloxxGame {
     this.ctx.save();
     this.ctx.translate(x, y);
     this.ctx.rotate(angle * 0.3); // 吊钩跟随摆角微倾
+    this.ctx.scale(0.82, 0.82);   // 精细缩放 18%，使其更加紧凑干练，与加粗钢绳完美比例配对！
 
     // 1. 顶部连接滑轮套件 (Dark Steel Pulley Block)
     const blockGrad = this.ctx.createLinearGradient(-10, -22, 10, 0);
