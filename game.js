@@ -845,19 +845,10 @@ class TowerBloxxGame {
 
     const bindBtn = (btn, fn) => {
       if (!btn) return;
-      let handled = false;
-      const handler = (e) => {
-        if (e) {
-          e.preventDefault();
-          e.stopPropagation();
-        }
-        if (handled) return;
-        handled = true;
-        setTimeout(() => { handled = false; }, 300);
+      btn.addEventListener('click', (e) => {
+        if (e) e.stopPropagation();
         fn();
-      };
-      btn.addEventListener('click', handler);
-      btn.addEventListener('touchend', handler);
+      });
     };
 
     bindBtn(this.dom.btnStart, () => this.startGame());
@@ -2260,12 +2251,12 @@ class TowerBloxxGame {
   // 极速预解析 RGB 缓存（彻底避免每帧字符串 Substring 消耗，超级提升 60FPS 渲染性能）
   parseHexColor(hex) {
     if (!this._colorCache) this._colorCache = {};
+    if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return [128, 128, 128];
     if (!this._colorCache[hex]) {
-      this._colorCache[hex] = [
-        parseInt(hex.slice(1, 3), 16),
-        parseInt(hex.slice(3, 5), 16),
-        parseInt(hex.slice(5, 7), 16)
-      ];
+      const r = parseInt(hex.slice(1, 3), 16) || 0;
+      const g = parseInt(hex.slice(3, 5), 16) || 0;
+      const b = parseInt(hex.slice(5, 7), 16) || 0;
+      this._colorCache[hex] = [r, g, b];
     }
     return this._colorCache[hex];
   },
