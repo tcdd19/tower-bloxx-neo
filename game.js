@@ -989,10 +989,15 @@ class TowerBloxxGame {
     this.state = 'MENU';
     this.hideElement(this.dom.gameOverScreen);
     this.hideElement(this.dom.pauseMenu);
+    this.hideElement(this.dom.victoryMenu);
     this.hideElement(this.dom.hudOverlay);
     this.hideElement(this.dom.tapInstruction);
     this.showElement(this.dom.startMenu, 'flex');
     this.updateHighScoreDisplay();
+  }
+
+  showStartMenu() {
+    this.goHome();
   }
 
   setTheme(themeName) {
