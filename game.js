@@ -745,7 +745,7 @@ class TowerBloxxGame {
       h: this.swingingBlock.h
     };
 
-    this.dom.tapInstruction.classList.add('hidden');
+    this.hideElement(this.dom.tapInstruction);
   }
 
   loseLife(reason) {
@@ -763,7 +763,11 @@ class TowerBloxxGame {
 
   triggerGameOver(reason) {
     this.state = 'GAMEOVER';
-    this.synth.playGameOver();
+    try {
+      this.synth.playGameOver();
+    } catch (e) {
+      console.warn("音效播放跳过:", e);
+    }
     this.triggerShake(16, 20); // E3: 游戏结束大地震屏
 
     // E2: 生成楼体坍塌物理碎片
@@ -788,13 +792,14 @@ class TowerBloxxGame {
       }
     }
 
-    this.dom.gameOverReasonText.innerText = reason;
-    this.dom.finalScoreVal.innerText = `${this.score} (${this.population} 居民)`;
-    this.dom.finalHeightVal.innerText = `${this.tower.length} 层`;
-    this.dom.maxComboVal.innerText = `x${this.maxCombo}`;
+    if (this.dom.gameOverReasonText) this.dom.gameOverReasonText.innerText = reason;
+    if (this.dom.finalScoreVal) this.dom.finalScoreVal.innerText = `${this.score} (${this.population} 居民)`;
+    if (this.dom.finalHeightVal) this.dom.finalHeightVal.innerText = `${this.tower.length} 层`;
+    if (this.dom.maxComboVal) this.dom.maxComboVal.innerText = `x${this.maxCombo}`;
 
-    this.dom.hudOverlay.classList.add('hidden');
-    this.dom.gameOverScreen.classList.remove('hidden');
+    this.hideElement(this.dom.hudOverlay);
+    this.hideElement(this.dom.tapInstruction);
+    this.showElement(this.dom.gameOverScreen, 'flex');
   }
 
   // E3: 触发屏幕震动
