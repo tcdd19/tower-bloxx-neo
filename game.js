@@ -1622,60 +1622,6 @@ class TowerBloxxGame {
     }
   }
 
-  // 绘制下落中楼层 (真实物理下落：包含目标楼顶投影、速度风噪拖尾、下落倾角)
-  drawFallingBlock() {
-    if (!this.fallingBlock) return;
-    const block = this.fallingBlock;
-    const isRetro = this.theme === 'retro';
-    const groundY = this.baseHeight - 120;
-    
-    const drawY = this.baseHeight - 120 - block.h - block.y + this.camera.y;
-
-    // 1. 绘制目标楼顶的接触预判动态阴影 (Target Roof Impact Shadow)
-    let targetY = 0;
-    if (this.tower.length > 0) {
-      targetY = this.tower[this.tower.length - 1].y + this.blockHeight;
-    }
-    const targetScreenY = groundY - targetY + this.camera.y;
-    const distToTarget = Math.max(0, block.y - targetY);
-    const maxDist = 350;
-    const shadowFactor = Math.max(0, 1 - distToTarget / maxDist);
-
-    if (shadowFactor > 0.05) {
-      this.ctx.save();
-      const shadowW = block.w * (0.5 + shadowFactor * 0.5);
-      const shadowH = 8 * shadowFactor;
-      this.ctx.fillStyle = isRetro ? 'rgba(15, 56, 15, 0.4)' : 'rgba(0, 0, 0, 0.35)';
-      this.ctx.beginPath();
-      this.ctx.ellipse(block.x, targetScreenY, shadowW / 2, shadowH / 2, 0, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.restore();
-    }
-
-    // 2. 绘制下落高速风噪拖尾线 (High-speed Motion Blur Trail)
-    if (!isRetro && block.vy > 6) {
-      this.ctx.save();
-      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
-      this.ctx.lineWidth = 1.5;
-      for (let i = -1; i <= 1; i += 2) {
-        const lx = block.x + (i * block.w * 0.35);
-        const trailLen = Math.min(35, block.vy * 2.2);
-        this.ctx.beginPath();
-        this.ctx.moveTo(lx, drawY + block.h / 2);
-        this.ctx.lineTo(lx, drawY + block.h / 2 - trailLen);
-        this.ctx.stroke();
-      }
-      this.ctx.restore();
-    }
-
-    // 3. 带有脱钩倾斜角与姿态下落的小房子
-    this.ctx.save();
-    this.ctx.translate(block.x, drawY + block.h / 2);
-    this.ctx.rotate(block.angle || 0);
-    this.drawScandinavianBlock(0, -block.h / 2, block.w, block.h, isRetro, 999, 0);
-    this.ctx.restore();
-  }
-
   // 绘制诺基亚原版 2.5D 伪立体建筑单元 (走心与精致渲染)
   // viewAngle: 当前视角偏转角 (负 = 看到左侧面, 正 = 看到右侧面)
   drawScandinavianBlock(x, y, w, h, isRetro, idx, viewAngle) {
@@ -1740,7 +1686,6 @@ class TowerBloxxGame {
     const topColor = '#48cae4';     // 顶面受光高亮
     const sideColor = '#014f86';    // 侧面深邃蓝色
     const outlineColor = '#03045e'; // 经典深蓝包边
-    const roofColor = '#ffb703';    // 温暖金黄房檐饰条
 
     this.ctx.strokeStyle = outlineColor;
     this.ctx.lineWidth = 2;
@@ -1795,29 +1740,23 @@ class TowerBloxxGame {
     this.ctx.fill();
     this.ctx.stroke();
 
-    // 顶面金黄边缘饰条 (左右两侧与后边缘完整金线框架)
-    this.ctx.fillStyle = roofColor;
-    // 左侧金线
+    // 顶面精致细香槟金边 (纤细 1.2px，典雅高级不臃肿)
+    this.ctx.strokeStyle = '#ffd166';
+    this.ctx.lineWidth = 1.2;
+
+    // 左斜边
     this.ctx.beginPath();
     this.ctx.moveTo(lx, y);
     this.ctx.lineTo(lx + depthX, y - depthY);
-    this.ctx.lineTo(lx + depthX + 4, y - depthY);
-    this.ctx.lineTo(lx + 4, y);
-    this.ctx.closePath();
-    this.ctx.fill();
+    this.ctx.stroke();
 
-    // 右侧金线 (修复原本缺失的右侧金线！)
+    // 右斜边
     this.ctx.beginPath();
     this.ctx.moveTo(rx, y);
     this.ctx.lineTo(rx + depthX, y - depthY);
-    this.ctx.lineTo(rx + depthX - 4, y - depthY);
-    this.ctx.lineTo(rx - 4, y);
-    this.ctx.closePath();
-    this.ctx.fill();
+    this.ctx.stroke();
 
-    // 后侧顶金边
-    this.ctx.strokeStyle = roofColor;
-    this.ctx.lineWidth = 2;
+    // 后顶边
     this.ctx.beginPath();
     this.ctx.moveTo(lx + depthX, y - depthY);
     this.ctx.lineTo(rx + depthX, y - depthY);
@@ -1843,26 +1782,26 @@ class TowerBloxxGame {
     this.ctx.lineTo(rx - 2, y + h * 0.66);
     this.ctx.stroke();
 
-    // 正面顶黄色护栏饰条 (带金黄渐变 + 金属压边)
+    // 正面顶精细香槟金护栏饰条 (纤细 3.5px)
     const gradRoof = this.ctx.createLinearGradient(lx, y, rx, y);
-    gradRoof.addColorStop(0, '#ffe5ec');
-    gradRoof.addColorStop(0.2, '#ffd166');
-    gradRoof.addColorStop(0.8, '#ffb703');
-    gradRoof.addColorStop(1, '#fb8500');
+    gradRoof.addColorStop(0, '#fff3b0');
+    gradRoof.addColorStop(0.3, '#ffd166');
+    gradRoof.addColorStop(0.7, '#e2b050');
+    gradRoof.addColorStop(1, '#ddb892');
     this.ctx.fillStyle = gradRoof;
     this.ctx.strokeStyle = outlineColor;
-    this.ctx.lineWidth = 1.5;
-    this.ctx.fillRect(lx, y - 1, w, 5);
-    this.ctx.strokeRect(lx, y - 1, w, 5);
+    this.ctx.lineWidth = 1.2;
+    this.ctx.fillRect(lx, y - 1, w, 3.5);
+    this.ctx.strokeRect(lx, y - 1, w, 3.5);
 
     // 护栏上的金属加固铆钉 (Corner rivets)
     this.ctx.fillStyle = '#03045e';
-    this.ctx.fillRect(lx + 1, y + 1, 2, 2);
-    this.ctx.fillRect(rx - 3, y + 1, 2, 2);
+    this.ctx.fillRect(lx + 1, y, 1.5, 1.5);
+    this.ctx.fillRect(rx - 2.5, y, 1.5, 1.5);
 
     // 饰条下方暗部阴影
-    this.ctx.fillStyle = 'rgba(0,0,0,0.18)';
-    this.ctx.fillRect(lx, y + 5, w, 2);
+    this.ctx.fillStyle = 'rgba(0,0,0,0.15)';
+    this.ctx.fillRect(lx, y + 3, w, 1.5);
 
     // ======= 4. 走心双窗户 =======
     const windowW = Math.max(10, Math.floor(w * 0.22));
@@ -1925,7 +1864,7 @@ class TowerBloxxGame {
     this.ctx.restore();
   }
 
-  // 绘制吊架、钢索与置顶吊钩 (置前渲染，吊钩抓握在房子前面)
+  // 绘制吊架、钢索、4角吊绳与置顶吊钩 (吊钩抓握在房子前面，4根吊绳勾住房顶四角)
   drawCrane() {
     const isRetro = this.theme === 'retro';
     
@@ -1947,9 +1886,9 @@ class TowerBloxxGame {
       }
     }
 
-    // 2. 钢索 (精确接到吊钩顶部环扣)
+    // 2. 主钢索 (连接到吊钩顶部环扣)
     this.ctx.strokeStyle = isRetro ? '#0f380f' : '#1e293b';
-    this.ctx.lineWidth = isRetro ? 3.5 : 3;
+    this.ctx.lineWidth = isRetro ? 3.5 : 2.5;
     this.ctx.beginPath();
     this.ctx.moveTo(trolleyX, this.crane.pivotY - 15);
     this.ctx.lineTo(swingX, swingY - 10);
@@ -1957,19 +1896,68 @@ class TowerBloxxGame {
 
     this.ctx.restore();
 
-    // 3. 【置前顺序 1】：先绘制悬挂中的小房子
+    // 3. 先绘制悬挂中的 2.5D 小房子
     if (!this.fallingBlock && this.state === 'PLAYING') {
       const block = this.swingingBlock;
       this.drawScandinavianBlock(swingX, swingY + 25, block.w, block.h, isRetro, 999, this.crane.angle);
+
+      // 4. 吊钩下方 4 根工业吊索 (分别连接小房子房顶 4 个 3D 角落)
+      if (!isRetro) {
+        const angle = this.crane.angle || 0;
+        const maxSideW = 14;
+        const maxDepthY = 10;
+        const sideW = Math.abs(Math.sin(angle)) * maxSideW;
+        const depthDir = angle >= 0 ? 1 : -1;
+        const depthX = sideW * depthDir;
+        const depthY = Math.abs(Math.sin(angle)) * maxDepthY + 4;
+
+        const lx = swingX - block.w / 2;
+        const rx = swingX + block.w / 2;
+        const yTop = swingY + 25;
+
+        // 吊钩抓扣中点 (吊绳起点)
+        const hookSlingX = swingX;
+        const hookSlingY = swingY + 12;
+
+        this.ctx.save();
+        this.ctx.strokeStyle = '#334155';
+        this.ctx.lineWidth = 1.2;
+
+        // 吊绳 1: 连接前左角
+        this.ctx.beginPath();
+        this.ctx.moveTo(hookSlingX, hookSlingY);
+        this.ctx.lineTo(lx, yTop);
+        this.ctx.stroke();
+
+        // 吊绳 2: 连接前右角
+        this.ctx.beginPath();
+        this.ctx.moveTo(hookSlingX, hookSlingY);
+        this.ctx.lineTo(rx, yTop);
+        this.ctx.stroke();
+
+        // 吊绳 3: 连接后左角 (3D 透视角)
+        this.ctx.beginPath();
+        this.ctx.moveTo(hookSlingX, hookSlingY);
+        this.ctx.lineTo(lx + depthX, yTop - depthY);
+        this.ctx.stroke();
+
+        // 吊绳 4: 连接后右角 (3D 透视角)
+        this.ctx.beginPath();
+        this.ctx.moveTo(hookSlingX, hookSlingY);
+        this.ctx.lineTo(rx + depthX, yTop - depthY);
+        this.ctx.stroke();
+
+        this.ctx.restore();
+      }
     }
 
-    // 4. 【置前顺序 2】：后绘制吊钩 (精准居中抓握在小房子房顶正中间！)
+    // 5. 后绘制吊钩 (将吊钩渲染在最前面，抓扣在 4 根吊绳交汇处！)
     this.ctx.save();
     if (!isRetro) {
       const hookImg = this.loader.assets['crane_hook_frames'];
       if (hookImg && hookImg.complete) {
         this.ctx.save();
-        this.ctx.translate(swingX, swingY + 24);
+        this.ctx.translate(swingX, swingY + 16);
         const totalFrames = 5;
         let normalizedAngle = (this.crane.angle + this.crane.angleRange) / (2 * this.crane.angleRange);
         normalizedAngle = Math.max(0, Math.min(1, normalizedAngle));
@@ -1979,13 +1967,12 @@ class TowerBloxxGame {
         const fw = 22;
         const fh = 19;
         const scale = 2.4;
-        // 吊钩位于房顶正中间，顶部圆环与钢索无缝相连，钩爪紧抓在房顶中点
         this.ctx.drawImage(hookImg, frameIndex * fw, 0, fw, fh, -fw*scale/2 + 1, -fh*scale + 2, fw*scale, fh*scale);
         this.ctx.restore();
       }
     } else {
       this.ctx.fillStyle = '#0f380f';
-      this.ctx.fillRect(swingX - 4, swingY + 20, 8, 6);
+      this.ctx.fillRect(swingX - 4, swingY + 14, 8, 6);
     }
     this.ctx.restore();
   }
