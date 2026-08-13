@@ -1795,22 +1795,33 @@ class TowerBloxxGame {
     this.ctx.fill();
     this.ctx.stroke();
 
-    // 顶面金黄边缘饰条
+    // 顶面金黄边缘饰条 (左右两侧与后边缘完整金线框架)
     this.ctx.fillStyle = roofColor;
+    // 左侧金线
     this.ctx.beginPath();
-    if (depthDir >= 0) {
-      this.ctx.moveTo(lx, y);
-      this.ctx.lineTo(lx + depthX, y - depthY);
-      this.ctx.lineTo(lx + depthX + 6, y - depthY);
-      this.ctx.lineTo(lx + 6, y);
-    } else {
-      this.ctx.moveTo(rx, y);
-      this.ctx.lineTo(rx + depthX, y - depthY);
-      this.ctx.lineTo(rx + depthX - 6, y - depthY);
-      this.ctx.lineTo(rx - 6, y);
-    }
+    this.ctx.moveTo(lx, y);
+    this.ctx.lineTo(lx + depthX, y - depthY);
+    this.ctx.lineTo(lx + depthX + 4, y - depthY);
+    this.ctx.lineTo(lx + 4, y);
     this.ctx.closePath();
     this.ctx.fill();
+
+    // 右侧金线 (修复原本缺失的右侧金线！)
+    this.ctx.beginPath();
+    this.ctx.moveTo(rx, y);
+    this.ctx.lineTo(rx + depthX, y - depthY);
+    this.ctx.lineTo(rx + depthX - 4, y - depthY);
+    this.ctx.lineTo(rx - 4, y);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    // 后侧顶金边
+    this.ctx.strokeStyle = roofColor;
+    this.ctx.lineWidth = 2;
+    this.ctx.beginPath();
+    this.ctx.moveTo(lx + depthX, y - depthY);
+    this.ctx.lineTo(rx + depthX, y - depthY);
+    this.ctx.stroke();
 
     // ======= 3. 正面墙体 (带渐变 + 建筑线纹 + 金属铆钉) =======
     this.ctx.shadowBlur = 0;
@@ -1936,12 +1947,12 @@ class TowerBloxxGame {
       }
     }
 
-    // 2. 钢索
+    // 2. 钢索 (精确接到吊钩顶部环扣)
     this.ctx.strokeStyle = isRetro ? '#0f380f' : '#1e293b';
     this.ctx.lineWidth = isRetro ? 3.5 : 3;
     this.ctx.beginPath();
     this.ctx.moveTo(trolleyX, this.crane.pivotY - 15);
-    this.ctx.lineTo(swingX, swingY + 10);
+    this.ctx.lineTo(swingX, swingY - 10);
     this.ctx.stroke();
 
     this.ctx.restore();
@@ -1952,13 +1963,13 @@ class TowerBloxxGame {
       this.drawScandinavianBlock(swingX, swingY + 25, block.w, block.h, isRetro, 999, this.crane.angle);
     }
 
-    // 4. 【置前顺序 2】：后绘制吊钩 (将吊钩渲染在小房子前面，吊钩扣在小房子前护栏上！)
+    // 4. 【置前顺序 2】：后绘制吊钩 (精准居中抓握在小房子房顶正中间！)
     this.ctx.save();
     if (!isRetro) {
       const hookImg = this.loader.assets['crane_hook_frames'];
       if (hookImg && hookImg.complete) {
         this.ctx.save();
-        this.ctx.translate(swingX, swingY + 12);
+        this.ctx.translate(swingX, swingY + 24);
         const totalFrames = 5;
         let normalizedAngle = (this.crane.angle + this.crane.angleRange) / (2 * this.crane.angleRange);
         normalizedAngle = Math.max(0, Math.min(1, normalizedAngle));
@@ -1967,14 +1978,14 @@ class TowerBloxxGame {
 
         const fw = 22;
         const fh = 19;
-        const scale = 2.5;
-        // 吊钩位于小房子前面，紧紧抓扣在屋顶黄色饰条上
-        this.ctx.drawImage(hookImg, frameIndex * fw, 0, fw, fh, -fw*scale/2, -fh*scale/2 + 2, fw*scale, fh*scale);
+        const scale = 2.4;
+        // 吊钩位于房顶正中间，顶部圆环与钢索无缝相连，钩爪紧抓在房顶中点
+        this.ctx.drawImage(hookImg, frameIndex * fw, 0, fw, fh, -fw*scale/2 + 1, -fh*scale + 2, fw*scale, fh*scale);
         this.ctx.restore();
       }
     } else {
       this.ctx.fillStyle = '#0f380f';
-      this.ctx.fillRect(swingX - 4, swingY + 10, 8, 6);
+      this.ctx.fillRect(swingX - 4, swingY + 20, 8, 6);
     }
     this.ctx.restore();
   }
