@@ -227,9 +227,8 @@ class ResidentParachute {
     }
   }
 
-  draw(ctx, loader) {
+  draw(ctx) {
     if (!this.active) return;
-    const img = loader ? loader.assets['sprite_residents'] : null;
 
     ctx.save();
     ctx.translate(this.x, this.y);
@@ -238,44 +237,85 @@ class ResidentParachute {
       const sway = Math.sin(this.time * 3) * 0.15;
       ctx.rotate(sway);
 
-      // 彩虹半圆降落伞
-      const chuteGrad = ctx.createLinearGradient(-15, -24, 15, -24);
+      // 彩虹半圆立体降落伞
+      const chuteGrad = ctx.createLinearGradient(-16, -26, 16, -26);
       chuteGrad.addColorStop(0, '#ef4444');
       chuteGrad.addColorStop(0.33, '#f59e0b');
       chuteGrad.addColorStop(0.66, '#10b981');
-      chuteGrad.addColorStop(1, '#3b82f6');
+      chuteGrad.addColorStop(1, '#38bdf8');
       ctx.fillStyle = chuteGrad;
       ctx.beginPath();
-      ctx.arc(0, -18, 15, Math.PI, 0);
+      ctx.arc(0, -18, 16, Math.PI, 0);
       ctx.closePath();
       ctx.fill();
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1.2;
       ctx.stroke();
 
-      // 降落伞挂绳
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-      ctx.lineWidth = 0.8;
+      // 降落伞 4 根高强度白色悬挂绳索
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.lineWidth = 1.0;
       ctx.beginPath();
-      ctx.moveTo(-14, -18); ctx.lineTo(0, -4);
-      ctx.moveTo(0, -18);   ctx.lineTo(0, -4);
-      ctx.moveTo(14, -18);  ctx.lineTo(0, -4);
+      ctx.moveTo(-14, -18); ctx.lineTo(-2, -4);
+      ctx.moveTo(-5, -18);  ctx.lineTo(-1, -4);
+      ctx.moveTo(5, -18);   ctx.lineTo(1, -4);
+      ctx.moveTo(14, -18);  ctx.lineTo(2, -4);
       ctx.stroke();
 
-      // 降落伞挂着的小居民
-      if (img && img.complete) {
-        ctx.drawImage(img, 0, 0, 23, 28, -11, -4, 22, 26);
-      } else {
-        ctx.fillStyle = '#f59e0b';
-        ctx.beginPath();
-        ctx.arc(0, 0, 4, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      // 100% 矢量超高清 Cute Chibi 小居民 (圆头 + 蓝衫 + 挥舞双臂)
+      // 头部
+      ctx.fillStyle = '#fed7aa';
+      ctx.beginPath();
+      ctx.arc(0, -4, 5, 0, Math.PI * 2);
+      ctx.fill();
+      // 眼睛
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(-2, -5, 1.5, 2);
+      ctx.fillRect(1, -5, 1.5, 2);
+
+      // 上衣
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(-4, 1, 8, 7);
+
+      // 裤子
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(-3, 8, 3, 4);
+      ctx.fillRect(1, 8, 3, 4);
+
+      // 挥舞双臂 (手握降落伞绳索)
+      ctx.strokeStyle = '#fed7aa';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(-4, 2); ctx.lineTo(-7, -2);
+      ctx.moveTo(4, 2);  ctx.lineTo(7, -2);
+      ctx.stroke();
+
     } else if (this.state === 'LANDED') {
-      // 成功降落窗户欢呼动作
-      if (img && img.complete) {
-        ctx.drawImage(img, 23, 0, 23, 28, -11, -14, 22, 26);
-      }
+      // 成功降落窗户欢呼 (矢量光晕 + 举双臂欢呼)
+      const glowGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, 16);
+      glowGrad.addColorStop(0, 'rgba(254, 240, 138, 0.85)');
+      glowGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+      ctx.fillStyle = glowGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, 16, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 欢呼小人
+      ctx.fillStyle = '#fed7aa';
+      ctx.beginPath();
+      ctx.arc(0, -6, 5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#f59e0b';
+      ctx.fillRect(-4, -1, 8, 7);
+
+      // 举高手臂 V 字欢呼姿态
+      ctx.strokeStyle = '#fed7aa';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(-4, 0); ctx.lineTo(-8, -9);
+      ctx.moveTo(4, 0);  ctx.lineTo(8, -9);
+      ctx.stroke();
     }
 
     ctx.restore();
@@ -1139,6 +1179,41 @@ class TowerBloxxGame {
     }
   }
 
+  // 无缝里程碑炫彩大绝招庆典 (不阻碍玩家无限盖楼!)
+  triggerMilestoneCelebration(floorCount) {
+    try {
+      this.synth.playPerfect(12);
+    } catch (e) {}
+    this.haptics.vibratePerfect();
+
+    // 奖励 500 居民与 2000 分
+    this.population += 500;
+    this.score += 2000;
+    this.updateHUD();
+
+    // 全屏发射 40 颗粒五彩星光与闪耀粒子
+    const topY = this.baseHeight - 120 - this.tower.length * this.blockHeight + this.camera.y;
+    for (let i = 0; i < 40; i++) {
+      const fx = this.baseWidth / 2 + (Math.random() - 0.5) * 260;
+      const fy = topY - Math.random() * 180;
+      this.particles.emit(fx, fy, '#ffd166', 25, false);
+      this.particles.emit(fx, fy, '#38bdf8', 25, false);
+      this.particles.emit(fx, fy, '#4ade80', 25, false);
+      this.spriteEffects.push(new SparkleStar(fx, fy, 3.0));
+    }
+
+    // 悬浮醒目金光里程碑通知
+    this.floatingTexts.push(new FloatingText(
+      `✨ ${floorCount}F 摩天里程碑达成! (+500居民) ✨`,
+      this.baseWidth / 2,
+      topY - 60,
+      '#ffd166'
+    ));
+
+    // 楼体金光加固震屏
+    this.triggerShake(8, 15);
+  }
+
   // E3: 触发屏幕震动
   triggerShake(intensity, duration = 12) {
     this.screenShake.intensity = intensity;
@@ -1448,9 +1523,9 @@ class TowerBloxxGame {
       this.camera.targetY = this.tower.length * this.blockHeight - 200;
     }
 
-    // 【50 层摩天大楼完美封顶胜利判定】
-    if (this.tower.length >= 50) {
-      this.triggerVictory();
+    // 【里程碑炫彩大绝招庆典】在 30F、50F、100F、150F... 无缝触发高能里程碑庆祝 (不锁死退出，玩家可无限高盖楼！!)
+    if (this.tower.length === 30 || this.tower.length === 50 || (this.tower.length > 50 && this.tower.length % 50 === 0)) {
+      this.triggerMilestoneCelebration(this.tower.length);
     }
   }
 
@@ -1566,23 +1641,41 @@ class TowerBloxxGame {
 
     this.ctx.save();
     
-    // 【Zone 6: 3200+ 高空深空彩蛋】超高清矢量深空发光神鲸 (Flying Space Whale)
-    if (altitude > 2800) {
-      const whaleY = this.baseHeight - 3800 + altitude * 0.9;
+    // 【Zone 8: 6500+ 银河系外与漩涡星系 (Spiral Galaxy)】
+    if (altitude > 5500) {
+      const galY = this.baseHeight - 7500 + altitude * 0.92;
+      this.drawHDVectorSpiralGalaxy(360, galY, 65);
+    }
+
+    // 【Zone 7: 4500 ~ 6500 深空引力透镜黑洞与外星人 UFO】
+    if (altitude > 4200) {
+      const bhY = this.baseHeight - 6200 + altitude * 0.9;
+      this.drawHDVectorBlackHole(95, bhY, 42);
+
+      const ufoY = this.baseHeight - 5100 + altitude * 0.9;
+      this.drawHDVectorUFO(320, ufoY);
+    }
+
+    // 【Zone 6: 3000 ~ 4800 太阳耀斑与深空发光神鲸】
+    if (altitude > 2600) {
+      const sunY = this.baseHeight - 4400 + altitude * 0.88;
+      this.drawHDVectorSun(380, sunY, 48);
+
+      const whaleY = this.baseHeight - 3600 + altitude * 0.88;
       this.drawHDVectorSpaceWhale(this.baseWidth / 2, whaleY);
     }
 
-    // 【Zone 5: 2200 ~ 3500 高空行星】超高清矢量海王星与 3D 光环土星
-    if (altitude > 1800) {
-      const nepY = this.baseHeight - 4200 + altitude * 0.85;
+    // 【Zone 5: 1800 ~ 3500 高空行星】超高清矢量海王星与 3D 光环土星
+    if (altitude > 1600) {
+      const nepY = this.baseHeight - 4000 + altitude * 0.85;
       this.drawHDVectorNeptune(350, nepY, 28);
 
-      const satY = this.baseHeight - 3200 + altitude * 0.85;
+      const satY = this.baseHeight - 3000 + altitude * 0.85;
       this.drawHDVectorSaturn(110, satY, 32);
     }
 
-    // 【Zone 4: 1400 ~ 2400 近地轨道】超高清矢量月球与火星
-    if (altitude > 1000) {
+    // 【Zone 4: 1000 ~ 2400 近地轨道】超高清矢量月球与火星
+    if (altitude > 800) {
       const marsY = this.baseHeight - 2400 + altitude * 0.8;
       this.drawHDVectorMars(390, marsY, 26);
 
@@ -1843,6 +1936,7 @@ class TowerBloxxGame {
   drawHDVectorBiplane(x, y) {
     this.ctx.save();
     this.ctx.translate(x, y);
+    this.ctx.scale(-1, 1); // 水平翻转：使机头朝向左侧 (匹配 propX 减小的飞行方向)，横幅向右拖尾！
 
     // 拖尾醒目彩旗 (Trailing Celebration Banner)
     this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
@@ -1927,6 +2021,175 @@ class TowerBloxxGame {
     this.ctx.restore();
   }
 
+  drawHDVectorSun(x, y, radius) {
+    this.ctx.save();
+    // 太阳强光日冕与耀斑光晕
+    const sunHalo = this.ctx.createRadialGradient(x, y, radius * 0.7, x, y, radius * 2.2);
+    sunHalo.addColorStop(0, 'rgba(254, 240, 138, 0.9)');
+    sunHalo.addColorStop(0.5, 'rgba(245, 158, 11, 0.45)');
+    sunHalo.addColorStop(1, 'rgba(245, 158, 11, 0)');
+    this.ctx.fillStyle = sunHalo;
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, radius * 2.2, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 太阳核心球体 (耀眼金红渐变)
+    const sunGrad = this.ctx.createRadialGradient(x - radius * 0.2, y - radius * 0.2, radius * 0.1, x, y, radius);
+    sunGrad.addColorStop(0, '#ffffff');
+    sunGrad.addColorStop(0.3, '#fef08a');
+    sunGrad.addColorStop(0.7, '#f59e0b');
+    sunGrad.addColorStop(1, '#ea580c');
+    this.ctx.fillStyle = sunGrad;
+    this.ctx.beginPath();
+    this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 太阳四散射线光芒 (Sunbeam Corona Rays)
+    this.ctx.strokeStyle = 'rgba(254, 240, 138, 0.35)';
+    this.ctx.lineWidth = 2;
+    for (let a = 0; a < Math.PI * 2; a += Math.PI / 6) {
+      this.ctx.beginPath();
+      this.ctx.moveTo(x + Math.cos(a) * (radius * 1.1), y + Math.sin(a) * (radius * 1.1));
+      this.ctx.lineTo(x + Math.cos(a) * (radius * 1.8), y + Math.sin(a) * (radius * 1.8));
+      this.ctx.stroke();
+    }
+
+    this.ctx.restore();
+  }
+
+  drawHDVectorUFO(x, y) {
+    this.ctx.save();
+    this.ctx.translate(x, y);
+
+    // 霓虹绿吸取光束 (Alien Abduction Tractor Beam)
+    const beamGrad = this.ctx.createLinearGradient(0, 0, 0, 120);
+    beamGrad.addColorStop(0, 'rgba(74, 222, 128, 0.45)');
+    beamGrad.addColorStop(1, 'rgba(74, 222, 128, 0)');
+    this.ctx.fillStyle = beamGrad;
+    this.ctx.beginPath();
+    this.ctx.moveTo(-12, 6);
+    this.ctx.lineTo(-45, 120);
+    this.ctx.lineTo(45, 120);
+    this.ctx.lineTo(12, 6);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    // 银白银色飞碟主体 (Saucer Body)
+    const saucerGrad = this.ctx.createLinearGradient(-35, 0, 35, 0);
+    saucerGrad.addColorStop(0, '#94a3b8');
+    saucerGrad.addColorStop(0.5, '#f8fafc');
+    saucerGrad.addColorStop(1, '#64748b');
+    this.ctx.fillStyle = saucerGrad;
+    this.ctx.strokeStyle = '#0f172a';
+    this.ctx.lineWidth = 1.2;
+
+    this.ctx.beginPath();
+    this.ctx.ellipse(0, 4, 38, 10, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.stroke();
+
+    // 飞碟透明玻璃驾驶舱 (Glass Cockpit Dome)
+    const domeGrad = this.ctx.createRadialGradient(0, -6, 2, 0, -6, 16);
+    domeGrad.addColorStop(0, 'rgba(186, 230, 253, 0.9)');
+    domeGrad.addColorStop(1, 'rgba(14, 165, 233, 0.6)');
+    this.ctx.fillStyle = domeGrad;
+    this.ctx.beginPath();
+    this.ctx.arc(0, -2, 16, Math.PI, 0);
+    this.ctx.fill();
+    this.ctx.stroke();
+
+    // 驾驶舱内的绿皮萌趣外星人 (Cute Green Alien Pilot)
+    this.ctx.fillStyle = '#4ade80';
+    this.ctx.beginPath();
+    this.ctx.arc(0, -6, 4.5, 0, Math.PI * 2);
+    this.ctx.fill();
+    // 硕大黑色大眼
+    this.ctx.fillStyle = '#0f172a';
+    this.ctx.beginPath();
+    this.ctx.arc(-2, -7, 1.5, 0, Math.PI * 2);
+    this.ctx.arc(2, -7, 1.5, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 飞碟四周霓虹发光警示灯点阵 (Pulsing Lights)
+    [-24, -12, 0, 12, 24].forEach((lx, i) => {
+      this.ctx.fillStyle = i % 2 === 0 ? '#4ade80' : '#f59e0b';
+      this.ctx.beginPath();
+      this.ctx.arc(lx, 6, 2.5, 0, Math.PI * 2);
+      this.ctx.fill();
+    });
+
+    this.ctx.restore();
+  }
+
+  drawHDVectorBlackHole(x, y, radius) {
+    this.ctx.save();
+    this.ctx.translate(x, y);
+
+    // 1. 引力透镜吸积盘 (Superheated Accretion Disk)
+    this.ctx.rotate(0.4);
+    const diskGrad = this.ctx.createRadialGradient(0, 0, radius * 0.9, 0, 0, radius * 2.6);
+    diskGrad.addColorStop(0, '#ffffff');
+    diskGrad.addColorStop(0.3, '#ffedd5');
+    diskGrad.addColorStop(0.6, '#f97316');
+    diskGrad.addColorStop(0.85, '#06b6d4');
+    diskGrad.addColorStop(1, 'rgba(6, 182, 212, 0)');
+    this.ctx.fillStyle = diskGrad;
+
+    this.ctx.beginPath();
+    this.ctx.ellipse(0, 0, radius * 2.6, radius * 0.7, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 2. 绝对黑洞视界 (Event Horizon Black Core)
+    this.ctx.fillStyle = '#000000';
+    this.ctx.beginPath();
+    this.ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 3. 纯白光子球环 (Photon Sphere Ring)
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+    this.ctx.lineWidth = 2.5;
+    this.ctx.beginPath();
+    this.ctx.arc(0, 0, radius + 1, 0, Math.PI * 2);
+    this.ctx.stroke();
+
+    this.ctx.restore();
+  }
+
+  drawHDVectorSpiralGalaxy(x, y, radius) {
+    this.ctx.save();
+    this.ctx.translate(x, y);
+    this.ctx.rotate(0.2);
+
+    // 旋涡星系紫色紫罗兰光晕
+    const galGrad = this.ctx.createRadialGradient(0, 0, radius * 0.2, 0, 0, radius * 2.0);
+    galGrad.addColorStop(0, '#ffffff');
+    galGrad.addColorStop(0.3, '#c084fc');
+    galGrad.addColorStop(0.7, '#38bdf8');
+    galGrad.addColorStop(1, 'rgba(56, 189, 248, 0)');
+    this.ctx.fillStyle = galGrad;
+    this.ctx.beginPath();
+    this.ctx.ellipse(0, 0, radius * 2.0, radius * 0.8, 0, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 双重旋臂 (Spiral Arms)
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+    this.ctx.lineWidth = 3;
+    for (let arm = 0; arm < 2; arm++) {
+      this.ctx.beginPath();
+      const startAngle = arm * Math.PI;
+      for (let a = 0; a < Math.PI * 2.5; a += 0.1) {
+        const r = (a / (Math.PI * 2.5)) * radius * 1.8;
+        const gx = Math.cos(startAngle + a) * r;
+        const gy = Math.sin(startAngle + a) * r * 0.4;
+        if (a === 0) this.ctx.moveTo(gx, gy);
+        else this.ctx.lineTo(gx, gy);
+      }
+      this.ctx.stroke();
+    }
+
+    this.ctx.restore();
+  }
+
   drawSpriteWithParallax(name, worldX, worldY, parallaxFactor, scale) {
     const scrollY = this.camera.y;
     const groundY = this.baseHeight - 120;
@@ -1967,11 +2230,14 @@ class TowerBloxxGame {
     this.ctx.fill();
     this.ctx.stroke();
 
+    let targetFloors = 50;
+    if (this.tower.length >= 50) targetFloors = Math.ceil((this.tower.length + 1) / 50) * 50;
+
     // 2. 顶端“楼层”标识
     this.ctx.fillStyle = '#94a3b8';
     this.ctx.font = 'bold 10px monospace';
     this.ctx.textAlign = 'center';
-    this.ctx.fillText('TARGET 50F', panelX + panelW / 2, panelY + 16);
+    this.ctx.fillText(`TARGET ${targetFloors}F`, panelX + panelW / 2, panelY + 16);
 
     // 3. 立体高度进度条槽
     const meterX = panelX + 16;
@@ -1987,7 +2253,7 @@ class TowerBloxxGame {
     this.ctx.stroke();
 
     // 充能发光刻度条
-    const progress = Math.min(1.0, this.tower.length / 50);
+    const progress = Math.min(1.0, (this.tower.length % 50) / 50 || (this.tower.length > 0 ? 1.0 : 0));
     const fillH = meterH * progress;
     if (fillH > 0) {
       const fillGrad = this.ctx.createLinearGradient(0, meterY + meterH, 0, meterY);
@@ -2008,7 +2274,7 @@ class TowerBloxxGame {
 
     this.ctx.fillStyle = '#cbd5e1';
     this.ctx.font = '10px sans-serif';
-    this.ctx.fillText('/50 层', panelX + 36, panelY + 66);
+    this.ctx.fillText(`/${targetFloors} 层`, panelX + 36, panelY + 66);
 
     // 4. 底部居民人数小图标 + 人数数值
     this.ctx.strokeStyle = '#334155';
@@ -2210,6 +2476,39 @@ class TowerBloxxGame {
       const blockAngle = block.landingAngle || (this.towerSway.offset * 0.005);
       this.drawScandinavianBlock(drawX, drawY, block.w, block.h, isRetro, idx, blockAngle);
     });
+
+    // 🌟 【高能连击金光护罩 (Golden Energy Field)】连击 >= 3 时，全塔两侧环绕流金脉冲柱！
+    if (this.combo >= 3 && this.tower.length > 0 && !isRetro) {
+      this.ctx.save();
+      const topIdx = this.tower.length - 1;
+      const topBlock = this.tower[topIdx];
+      const topY = groundY - (topIdx + 1) * topBlock.h + this.camera.y;
+      const towerH = this.tower.length * this.blockHeight;
+
+      const auraGrad = this.ctx.createLinearGradient(0, topY, 0, topY + towerH);
+      auraGrad.addColorStop(0, 'rgba(255, 209, 102, 0.7)');
+      auraGrad.addColorStop(0.5, 'rgba(245, 158, 11, 0.35)');
+      auraGrad.addColorStop(1, 'rgba(255, 209, 102, 0)');
+
+      this.ctx.strokeStyle = auraGrad;
+      this.ctx.lineWidth = 3.5;
+      this.ctx.shadowBlur = 12;
+      this.ctx.shadowColor = '#ffd166';
+
+      // 左侧发光能量柱
+      this.ctx.beginPath();
+      this.ctx.moveTo(topBlock.x - topBlock.w / 2 - 6, topY - 10);
+      this.ctx.lineTo(topBlock.x - topBlock.w / 2 - 6, topY + towerH);
+      this.ctx.stroke();
+
+      // 右侧发光能量柱
+      this.ctx.beginPath();
+      this.ctx.moveTo(topBlock.x + topBlock.w / 2 + 6, topY - 10);
+      this.ctx.lineTo(topBlock.x + topBlock.w / 2 + 6, topY + towerH);
+      this.ctx.stroke();
+
+      this.ctx.restore();
+    }
 
     // E1: 仅在游戏结束 (GAMEOVER) 楼房封顶时，给最高层画封顶屋顶盖 (Roof Cap)
     if (this.state === 'GAMEOVER' && this.tower.length > 0) {
