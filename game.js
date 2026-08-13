@@ -1743,7 +1743,9 @@ class TowerBloxxGame {
     const roofColor = '#ffb703';    // 温暖金黄房檐饰条
 
     this.ctx.strokeStyle = outlineColor;
-    this.ctx.lineWidth = 2.5;
+    this.ctx.lineWidth = 2;
+    this.ctx.lineJoin = 'round';
+    this.ctx.lineCap = 'round';
 
     // 下落发光
     if (idx === 999) {
@@ -1839,13 +1841,13 @@ class TowerBloxxGame {
     this.ctx.fillStyle = gradRoof;
     this.ctx.strokeStyle = outlineColor;
     this.ctx.lineWidth = 1.5;
-    this.ctx.fillRect(lx - 2, y - 1, w + 4, 6);
-    this.ctx.strokeRect(lx - 2, y - 1, w + 4, 6);
+    this.ctx.fillRect(lx, y - 1, w, 5);
+    this.ctx.strokeRect(lx, y - 1, w, 5);
 
     // 护栏上的金属加固铆钉 (Corner rivets)
     this.ctx.fillStyle = '#03045e';
-    this.ctx.fillRect(lx, y + 1, 2, 2);
-    this.ctx.fillRect(rx - 2, y + 1, 2, 2);
+    this.ctx.fillRect(lx + 1, y + 1, 2, 2);
+    this.ctx.fillRect(rx - 3, y + 1, 2, 2);
 
     // 饰条下方暗部阴影
     this.ctx.fillStyle = 'rgba(0,0,0,0.18)';
