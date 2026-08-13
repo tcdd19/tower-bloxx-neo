@@ -1533,12 +1533,14 @@ class TowerBloxxGame {
     }
     this.spriteEffects.push(new SpriteDustPuff(landing.x, landingScreenY, 2.5));
 
-    // 触发居民降落伞入住动画 (3 ~ 5 名彩虹降落伞小居民 100% 精准飘落至新房顶中心)
+    // 触发居民降落伞入住动画 (3 ~ 5 名小居民随机自然分布在屋顶范畴内，绝不出界，呈现热气腾腾的生活气息!)
     const targetBlockIndex = this.tower.length;
     const resCount = isPerfect ? 5 : 3;
+    const maxRoofOffset = landing.w * 0.36; // 80px * 0.36 = +/-28.8px 限制在屋顶安全范畴内
     for (let r = 0; r < resCount; r++) {
-      const offsetX = (r - (resCount - 1) / 2) * 12; // 集中分布在屋顶中心 +/-12px
-      const startX = landing.x + offsetX + (Math.random() - 0.5) * 8;
+      const spreadRatio = resCount > 1 ? (r / (resCount - 1) - 0.5) : 0;
+      const offsetX = spreadRatio * (maxRoofOffset * 1.6) + (Math.random() - 0.5) * 8;
+      const startX = landing.x + offsetX + (Math.random() - 0.5) * 10;
       const startY = landingScreenY - 150 - Math.random() * 30;
       this.spriteEffects.push(new ResidentParachute(startX, startY, targetBlockIndex, offsetX));
     }
@@ -2255,12 +2257,27 @@ class TowerBloxxGame {
     }
   }
 
-  // A5+D1: 颜色插值优化（钳位 + 减少 GC 分配）
+  // 极速预解析 RGB 缓存（彻底避免每帧字符串 Substring 消耗，超级提升 60FPS 渲染性能）
+  parseHexColor(hex) {
+    if (!this._colorCache) this._colorCache = {};
+    if (!this._colorCache[hex]) {
+      this._colorCache[hex] = [
+        parseInt(hex.slice(1, 3), 16),
+        parseInt(hex.slice(3, 5), 16),
+        parseInt(hex.slice(5, 7), 16)
+      ];
+    }
+    return this._colorCache[hex];
+  },
+
   interpolateColor(color1, color2, factor) {
-    factor = Math.max(0, Math.min(1, factor));
-    const r1 = parseInt(color1.slice(1,3), 16), g1 = parseInt(color1.slice(3,5), 16), b1 = parseInt(color1.slice(5,7), 16);
-    const r2 = parseInt(color2.slice(1,3), 16), g2 = parseInt(color2.slice(3,5), 16), b2 = parseInt(color2.slice(5,7), 16);
-    return `rgb(${Math.round(r1+(r2-r1)*factor)},${Math.round(g1+(g2-g1)*factor)},${Math.round(b1+(b2-b1)*factor)})`;
+    factor = factor < 0 ? 0 : (factor > 1 ? 1 : factor);
+    const c1 = this.parseHexColor(color1);
+    const c2 = this.parseHexColor(color2);
+    const r = Math.round(c1[0] + (c2[0] - c1[0]) * factor);
+    const g = Math.round(c1[1] + (c2[1] - c1[1]) * factor);
+    const b = Math.round(c1[2] + (c2[2] - c1[2]) * factor);
+    return `rgb(${r},${g},${b})`;
   }
 
   // 绘制左下角原版风格楼层目标进度与居民数仪表盘
@@ -2523,7 +2540,8 @@ class TowerBloxxGame {
       const drawX = block.x + currentBlockSway;
       const drawY = groundY - (idx + 1) * block.h + this.camera.y;
 
-      if (drawY > this.baseHeight + 100) return;
+      // 超出屏幕下边或上边的楼层视口裁剪，直接跳过 (极速 60FPS 性能!)
+      if (drawY > this.baseHeight + 100 || drawY < -100) return;
 
       const blockAngle = block.landingAngle || (this.towerSway.offset * 0.005);
       this.drawScandinavianBlock(drawX, drawY, block.w, block.h, isRetro, idx, blockAngle);
