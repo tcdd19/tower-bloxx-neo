@@ -924,7 +924,7 @@ class TowerBloxxGame {
     const swingY = this.crane.pivotY + Math.cos(this.crane.angle) * currentRopeLen;
     
     const groundY = this.baseHeight - 120;
-    const worldY = groundY - (swingY + 12) - this.swingingBlock.h + this.camera.y;
+    const worldY = groundY - (swingY + 58) - this.swingingBlock.h + this.camera.y;
 
     // 释放顶部机械蒸汽
     const isRetro = this.theme === 'retro';
@@ -1918,7 +1918,7 @@ class TowerBloxxGame {
     this.ctx.restore();
   }
 
-  // 绘制吊架、钢索、4角吊绳与置顶吊钩 (吊钩抓握在房子前面，4根吊绳勾住房顶四角)
+  // 绘制吊架、主钢索、加长 4 角动态吊索与超高清重工业金属吊钩
   drawCrane() {
     const isRetro = this.theme === 'retro';
     
@@ -1940,22 +1940,23 @@ class TowerBloxxGame {
       }
     }
 
-    // 2. 主钢索 (连接到吊钩顶部环扣)
-    this.ctx.strokeStyle = isRetro ? '#0f380f' : '#1e293b';
+    // 2. 主悬挂钢索 (精确接到吊钩顶部滑轮套件)
+    this.ctx.strokeStyle = isRetro ? '#0f380f' : '#0f172a';
     this.ctx.lineWidth = isRetro ? 3.5 : 2.5;
     this.ctx.beginPath();
     this.ctx.moveTo(trolleyX, this.crane.pivotY - 15);
-    this.ctx.lineTo(swingX, swingY - 10);
+    this.ctx.lineTo(swingX, swingY - 22);
     this.ctx.stroke();
 
     this.ctx.restore();
 
-    // 3. 先绘制悬挂中的 2.5D 小房子
+    // 3. 绘制悬挂中的 2.5D 小房子 (下移至 swingY + 58，提供逼真的 40px 加长吊绳空间)
     if (!this.fallingBlock && this.state === 'PLAYING') {
       const block = this.swingingBlock;
-      this.drawScandinavianBlock(swingX, swingY + 25, block.w, block.h, isRetro, 999, this.crane.angle);
+      const houseY = swingY + 58;
+      this.drawScandinavianBlock(swingX, houseY, block.w, block.h, isRetro, 999, this.crane.angle);
 
-      // 4. 吊钩下方 4 根工业吊索 (分别连接小房子房顶 4 个 3D 角落)
+      // 4. 【精准 4 角工业吊索 + 动态物理弯曲张力动画】
       if (!isRetro) {
         const angle = this.crane.angle || 0;
         const maxSideW = 14;
@@ -1967,67 +1968,137 @@ class TowerBloxxGame {
 
         const lx = swingX - block.w / 2;
         const rx = swingX + block.w / 2;
-        const yTop = swingY + 25;
+        const yTop = houseY;
 
-        // 吊钩抓扣中点 (吊绳起点)
-        const hookSlingX = swingX;
-        const hookSlingY = swingY + 12;
+        // 钩爪内嘴精准起点 (与 drawHDMetallicHook 的爪口坐标 (0, 18) 100% 重合匹配)
+        const hookTipX = swingX;
+        const hookTipY = swingY + 18;
+
+        // 动态物理惯性弧度参数 (随摆动速度弹性弯曲)
+        const swingVel = Math.cos(this.crane.time || 0) * 12;
+        const flexX = swingVel * 0.15;
 
         this.ctx.save();
-        this.ctx.strokeStyle = '#334155';
-        this.ctx.lineWidth = 1.2;
+        this.ctx.lineCap = 'round';
 
-        // 吊绳 1: 连接前左角
-        this.ctx.beginPath();
-        this.ctx.moveTo(hookSlingX, hookSlingY);
-        this.ctx.lineTo(lx, yTop);
-        this.ctx.stroke();
+        const corners = [
+          { x: lx, y: yTop },                          // 前左角
+          { x: rx, y: yTop },                          // 前右角
+          { x: lx + depthX, y: yTop - depthY },        // 后左角 (3D 透视)
+          { x: rx + depthX, y: yTop - depthY }         // 后右角 (3D 透视)
+        ];
 
-        // 吊绳 2: 连接前右角
-        this.ctx.beginPath();
-        this.ctx.moveTo(hookSlingX, hookSlingY);
-        this.ctx.lineTo(rx, yTop);
-        this.ctx.stroke();
+        // 绘制 4 根加长高强度编织钢丝吊索
+        corners.forEach(c => {
+          const midX = (hookTipX + c.x) / 2 + flexX;
+          const midY = (hookTipY + c.y) / 2;
 
-        // 吊绳 3: 连接后左角 (3D 透视角)
-        this.ctx.beginPath();
-        this.ctx.moveTo(hookSlingX, hookSlingY);
-        this.ctx.lineTo(lx + depthX, yTop - depthY);
-        this.ctx.stroke();
+          // 钢丝暗色主干线
+          this.ctx.strokeStyle = '#1e293b';
+          this.ctx.lineWidth = 1.8;
+          this.ctx.beginPath();
+          this.ctx.moveTo(hookTipX, hookTipY);
+          this.ctx.quadraticCurveTo(midX, midY, c.x, c.y);
+          this.ctx.stroke();
 
-        // 吊绳 4: 连接后右角 (3D 透视角)
-        this.ctx.beginPath();
-        this.ctx.moveTo(hookSlingX, hookSlingY);
-        this.ctx.lineTo(rx + depthX, yTop - depthY);
-        this.ctx.stroke();
+          // 钢丝金属光泽高光线 (提升工业质感)
+          this.ctx.strokeStyle = '#94a3b8';
+          this.ctx.lineWidth = 0.8;
+          this.ctx.beginPath();
+          this.ctx.moveTo(hookTipX, hookTipY);
+          this.ctx.quadraticCurveTo(midX, midY, c.x, c.y);
+          this.ctx.stroke();
+        });
 
         this.ctx.restore();
       }
     }
 
-    // 5. 后绘制吊钩 (将吊钩渲染在最前面，抓扣在 4 根吊绳交汇处！)
-    this.ctx.save();
+    // 5. 置顶绘制【超高清矢量金属吊钩】 (精准咬合在 4 根吊绳交汇处)
     if (!isRetro) {
-      const hookImg = this.loader.assets['crane_hook_frames'];
-      if (hookImg && hookImg.complete) {
-        this.ctx.save();
-        this.ctx.translate(swingX, swingY + 16);
-        const totalFrames = 5;
-        let normalizedAngle = (this.crane.angle + this.crane.angleRange) / (2 * this.crane.angleRange);
-        normalizedAngle = Math.max(0, Math.min(1, normalizedAngle));
-        let frameIndex = Math.floor(normalizedAngle * totalFrames);
-        if (frameIndex >= totalFrames) frameIndex = totalFrames - 1;
-
-        const fw = 22;
-        const fh = 19;
-        const scale = 2.4;
-        this.ctx.drawImage(hookImg, frameIndex * fw, 0, fw, fh, -fw*scale/2 + 1, -fh*scale + 2, fw*scale, fh*scale);
-        this.ctx.restore();
-      }
+      this.drawHDMetallicHook(swingX, swingY, this.crane.angle);
     } else {
       this.ctx.fillStyle = '#0f380f';
       this.ctx.fillRect(swingX - 4, swingY + 14, 8, 6);
     }
+  }
+
+  // 辅助函数：超高清矢量重绘重工业金属吊钩 (带黄铜轴承、铸钢弧线与金属高光)
+  drawHDMetallicHook(x, y, angle) {
+    this.ctx.save();
+    this.ctx.translate(x, y);
+    this.ctx.rotate(angle * 0.3); // 吊钩跟随摆角微倾
+
+    // 1. 顶部连接滑轮套件 (Dark Steel Pulley Block)
+    const blockGrad = this.ctx.createLinearGradient(-10, -22, 10, 0);
+    blockGrad.addColorStop(0, '#475569');
+    blockGrad.addColorStop(0.5, '#1e293b');
+    blockGrad.addColorStop(1, '#0f172a');
+    this.ctx.fillStyle = blockGrad;
+    this.ctx.strokeStyle = '#020617';
+    this.ctx.lineWidth = 1.5;
+    
+    // 滑轮方盒框
+    this.ctx.beginPath();
+    this.drawRoundedRect(-9, -22, 18, 18, 3);
+    this.ctx.fill();
+    this.ctx.stroke();
+
+    // 黄铜主轴承铆钉 (Brass Bearing Rivet)
+    this.ctx.fillStyle = '#f59e0b';
+    this.ctx.strokeStyle = '#78350f';
+    this.ctx.lineWidth = 1;
+    this.ctx.beginPath();
+    this.ctx.arc(0, -13, 4.5, 0, Math.PI * 2);
+    this.ctx.fill();
+    this.ctx.stroke();
+
+    this.ctx.fillStyle = '#fef08a';
+    this.ctx.beginPath();
+    this.ctx.arc(-1.5, -14.5, 1.5, 0, Math.PI * 2);
+    this.ctx.fill();
+
+    // 2. 锻钢吊钩弧形钩爪主体 (Forged Heavy Steel Hook Shank & Mouth)
+    const hookGrad = this.ctx.createLinearGradient(-14, -4, 14, 28);
+    hookGrad.addColorStop(0, '#64748b');
+    hookGrad.addColorStop(0.3, '#334155');
+    hookGrad.addColorStop(0.7, '#1e293b');
+    hookGrad.addColorStop(1, '#0f172a');
+
+    this.ctx.fillStyle = hookGrad;
+    this.ctx.strokeStyle = '#020617';
+    this.ctx.lineWidth = 1.8;
+    this.ctx.lineJoin = 'round';
+
+    // 绘制标准重工业 G 形吊钩 Path
+    this.ctx.beginPath();
+    this.ctx.moveTo(-4, -4);
+    this.ctx.lineTo(-4, 4);
+    // 钩弧外侧
+    this.ctx.bezierCurveTo(-14, 6, -14, 24, 0, 26);
+    this.ctx.bezierCurveTo(12, 28, 15, 14, 7, 8);
+    // 钩爪内侧嘴 (爪口中点精准位于 (0, 18))
+    this.ctx.bezierCurveTo(4, 12, 4, 18, -1, 18);
+    this.ctx.bezierCurveTo(-7, 18, -6, 8, 4, -4);
+    this.ctx.closePath();
+    this.ctx.fill();
+    this.ctx.stroke();
+
+    // 3. 吊钩金属高光划痕 (Steel Specular Highlight)
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    this.ctx.lineWidth = 1.2;
+    this.ctx.beginPath();
+    this.ctx.bezierCurveTo(-11, 8, -11, 20, -2, 24);
+    this.ctx.stroke();
+
+    // 4. 安全防脱锁扣 (Spring Safety Latch)
+    this.ctx.strokeStyle = '#94a3b8';
+    this.ctx.lineWidth = 1.5;
+    this.ctx.beginPath();
+    this.ctx.moveTo(3, 2);
+    this.ctx.lineTo(-2, 16);
+    this.ctx.stroke();
+
     this.ctx.restore();
   }
 
