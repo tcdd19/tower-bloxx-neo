@@ -64,8 +64,8 @@
         <p class="game-subtitle">重温经典，指尖盖楼</p>
         
         <div class="button-group">
-          <button id="btn-start-game" class="btn btn-primary" onclick="window.gameInstance && window.gameInstance.startGame()">开始游戏</button>
-          <button id="btn-open-settings" class="btn btn-secondary">游戏设置</button>
+          <button id="btn-start-game" class="btn btn-primary" onclick="startGameDirectly(event)">开始游戏</button>
+          <button id="btn-open-settings" class="btn btn-secondary" onclick="openSettingsDirectly(event)">游戏设置</button>
         </div>
         
         <div class="high-score-board">
@@ -137,8 +137,8 @@
         </div>
 
         <div class="button-group">
-          <button id="btn-restart-game" class="btn btn-primary">再来一局</button>
-          <button id="btn-return-home" class="btn btn-secondary">主菜单</button>
+          <button id="btn-restart-game" class="btn btn-primary" onclick="startGameDirectly(event)">再来一局</button>
+          <button id="btn-return-home" class="btn btn-secondary" onclick="goHomeDirectly(event)">主菜单</button>
         </div>
       </div>
 
@@ -163,8 +163,8 @@
         </div>
 
         <div class="button-group">
-          <button id="btn-victory-restart" class="btn btn-primary" onclick="window.gameInstance && window.gameInstance.startGame()">挑战下一座大楼</button>
-          <button id="btn-victory-home" class="btn btn-secondary" onclick="window.gameInstance && window.gameInstance.showStartMenu()">返回主菜单</button>
+          <button id="btn-victory-restart" class="btn btn-primary" onclick="startGameDirectly(event)">挑战下一座大楼</button>
+          <button id="btn-victory-home" class="btn btn-secondary" onclick="goHomeDirectly(event)">返回主菜单</button>
         </div>
       </div>
 

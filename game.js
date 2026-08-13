@@ -3262,3 +3262,98 @@ if (document.readyState === 'loading') {
 } else {
   initGameEngine();
 }
+
+// --------------------------------------------------------------------------
+// 全局直连按钮点击防死锁回调 (保证无论任何环境/引擎状态，点击按钮 100% 毫秒级关弹窗)
+// --------------------------------------------------------------------------
+window.startGameDirectly = function(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const startMenu = document.getElementById('start-menu');
+  if (startMenu) {
+    startMenu.classList.add('hidden');
+    startMenu.style.display = 'none';
+    startMenu.style.opacity = '0';
+    startMenu.style.pointerEvents = 'none';
+    startMenu.style.visibility = 'hidden';
+  }
+  const gameOver = document.getElementById('game-over-screen');
+  if (gameOver) {
+    gameOver.classList.add('hidden');
+    gameOver.style.display = 'none';
+  }
+  const victory = document.getElementById('victory-menu');
+  if (victory) {
+    victory.classList.add('hidden');
+    victory.style.display = 'none';
+  }
+  const hudOverlay = document.getElementById('hud-overlay');
+  if (hudOverlay) {
+    hudOverlay.classList.remove('hidden');
+    hudOverlay.style.display = 'flex';
+    hudOverlay.style.opacity = '1';
+  }
+  const tapHint = document.getElementById('tap-instruction');
+  if (tapHint) {
+    tapHint.classList.remove('hidden');
+    tapHint.style.display = 'block';
+  }
+  if (!window.gameInstance) {
+    window.gameInstance = new TowerBloxxGame();
+  }
+  window.gameInstance.startGame();
+};
+
+window.openSettingsDirectly = function(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const startMenu = document.getElementById('start-menu');
+  if (startMenu) startMenu.style.display = 'none';
+  const settingsMenu = document.getElementById('settings-menu');
+  if (settingsMenu) {
+    settingsMenu.classList.remove('hidden');
+    settingsMenu.style.display = 'flex';
+    settingsMenu.style.opacity = '1';
+  }
+  if (window.gameInstance) window.gameInstance.openSettings();
+};
+
+window.closeSettingsDirectly = function(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const settingsMenu = document.getElementById('settings-menu');
+  if (settingsMenu) settingsMenu.style.display = 'none';
+  const startMenu = document.getElementById('start-menu');
+  if (startMenu) {
+    startMenu.classList.remove('hidden');
+    startMenu.style.display = 'flex';
+    startMenu.style.opacity = '1';
+  }
+  if (window.gameInstance) window.gameInstance.closeSettings();
+};
+
+window.goHomeDirectly = function(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  ['game-over-screen', 'pause-menu', 'victory-menu', 'settings-menu'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+  const startMenu = document.getElementById('start-menu');
+  if (startMenu) {
+    startMenu.classList.remove('hidden');
+    startMenu.style.display = 'flex';
+    startMenu.style.opacity = '1';
+    startMenu.style.pointerEvents = 'auto';
+    startMenu.style.visibility = 'visible';
+  }
+  if (window.gameInstance) window.gameInstance.goHome();
+};
