@@ -20,7 +20,7 @@ class AssetLoader {
       'bg_mountains', 'bg_jet_plane', 'bg_propeller_plane', 'bg_flying_whales', 'space_moon', 'space_mars',
       'space_saturn', 'space_neptune', 'space_glow', 'fx_dust_puff', 'fx_sparkle_star', 'fx_debris',
       'fx_speed_lines', 'fx_wind_sway', 'badge_town', 'badge_city', 'badge_metropolis', 'badge_megacity',
-      'ui_drop_shadow', 'icon'
+      'ui_drop_shadow', 'icon', 'roof_tops_deluxe', 'block_window_unit'
     ];
     this.total = images.length;
     let loadedCount = 0;
@@ -1185,7 +1185,8 @@ class TowerBloxxGame {
       y: landing.y,
       w: landing.w,
       h: landing.h,
-      offsetX: blockOffsetX
+      offsetX: blockOffsetX,
+      landingAngle: landing.angle || (dx / landing.w * 0.25)
     });
 
     this.updateHUD();
@@ -1497,10 +1498,11 @@ class TowerBloxxGame {
 
       if (drawY > this.baseHeight + 100) return;
 
-      this.drawScandinavianBlock(drawX, drawY, block.w, block.h, isRetro, idx);
+      const blockAngle = block.landingAngle || (this.towerSway.offset * 0.005);
+      this.drawScandinavianBlock(drawX, drawY, block.w, block.h, isRetro, idx, blockAngle);
     });
 
-    // E1: 给最高层画封顶尖塔/红旗 (屋顶 Roof Cap)
+    // E1: 给最高层画封顶 2.5D 豪华屋顶盖 (Roof Cap)
     if (this.tower.length > 0) {
       const topIdx = this.tower.length - 1;
       const topBlock = this.tower[topIdx];
@@ -1508,44 +1510,43 @@ class TowerBloxxGame {
       const topX = topBlock.x + topSway;
       const topY = groundY - (topIdx + 1) * topBlock.h + this.camera.y;
 
-      const isRed = this.tower.length % 2 === 0;
-      const variant = this.tower.length % 4;
-      const roofName = isRed ? 'roof_red_variants' : 'roof_yellow_variants';
-      const roofImg = this.loader.assets[roofName];
-      
-      if (roofImg && roofImg.complete && !isRetro && this.tower.length > 2) {
-        const fw = isRed ? 22 : 25;
-        const fh = isRed ? 22 : 25;
-        const scale = topBlock.w / fw; 
-        this.ctx.drawImage(roofImg, variant * fw, 0, fw, fh, topX - topBlock.w/2, topY - fh * scale, fw * scale, fh * scale);
+      const deluxeRoofImg = this.loader.assets['roof_tops_deluxe'];
+      if (deluxeRoofImg && deluxeRoofImg.complete && !isRetro) {
+        // 4 种颜色的 Deluxe 3D 金字塔/俯视屋顶 (蓝、红、绿、黄)
+        const frameIdx = topIdx % 4;
+        const fw = 28;
+        const fh = 28;
+        const scale = (topBlock.w * 0.9) / fw;
+        const roofDrawW = fw * scale;
+        const roofDrawH = fh * scale;
+        this.ctx.drawImage(
+          deluxeRoofImg,
+          frameIdx * fw, 0, fw, fh,
+          topX - roofDrawW / 2, topY - roofDrawH * 0.75,
+          roofDrawW, roofDrawH
+        );
       } else {
-        this.ctx.save();
-        // 尖顶红三角
-        this.ctx.fillStyle = isRetro ? '#0f380f' : '#ff6b6b';
-        this.ctx.beginPath();
-        this.ctx.moveTo(topX - 14, topY);
-        this.ctx.lineTo(topX, topY - 20);
-        this.ctx.lineTo(topX + 14, topY);
-        this.ctx.closePath();
-        this.ctx.fill();
-
-        // 旗杆
-        this.ctx.strokeStyle = isRetro ? '#0f380f' : '#2c3e50';
-        this.ctx.lineWidth = 2;
-        this.ctx.beginPath();
-        this.ctx.moveTo(topX, topY - 20);
-        this.ctx.lineTo(topX, topY - 36);
-        this.ctx.stroke();
-
-        // 飘扬红旗
-        this.ctx.fillStyle = isRetro ? '#8bac0f' : '#ffd166';
-        this.ctx.beginPath();
-        this.ctx.moveTo(topX, topY - 36);
-        this.ctx.lineTo(topX + 12, topY - 30);
-        this.ctx.lineTo(topX, topY - 24);
-        this.ctx.closePath();
-        this.ctx.fill();
-        this.ctx.restore();
+        const isRed = this.tower.length % 2 === 0;
+        const variant = this.tower.length % 4;
+        const roofName = isRed ? 'roof_red_variants' : 'roof_yellow_variants';
+        const roofImg = this.loader.assets[roofName];
+        
+        if (roofImg && roofImg.complete && !isRetro && this.tower.length > 2) {
+          const fw = isRed ? 22 : 25;
+          const fh = isRed ? 22 : 25;
+          const scale = topBlock.w / fw; 
+          this.ctx.drawImage(roofImg, variant * fw, 0, fw, fh, topX - topBlock.w/2, topY - fh * scale, fw * scale, fh * scale);
+        } else {
+          this.ctx.save();
+          this.ctx.fillStyle = isRetro ? '#0f380f' : '#ff6b6b';
+          this.ctx.beginPath();
+          this.ctx.moveTo(topX - 14, topY);
+          this.ctx.lineTo(topX, topY - 20);
+          this.ctx.lineTo(topX + 14, topY);
+          this.ctx.closePath();
+          this.ctx.fill();
+          this.ctx.restore();
+        }
       }
     }
   }
@@ -1600,92 +1601,111 @@ class TowerBloxxGame {
     this.ctx.save();
     this.ctx.translate(block.x, drawY + block.h / 2);
     this.ctx.rotate(block.angle || 0);
-    this.drawScandinavianBlock(0, -block.h / 2, block.w, block.h, isRetro, 999);
+    this.drawScandinavianBlock(0, -block.h / 2, block.w, block.h, isRetro, 999, 0);
     this.ctx.restore();
   }
 
-  // 绘制诺基亚原版 2.5D 伪立体建筑单元 (正面 + 顶面 + 右侧面)
-  drawScandinavianBlock(x, y, w, h, isRetro, idx) {
+  // 绘制诺基亚原版 2.5D 伪立体建筑单元
+  // viewAngle: 当前视角偏转角 (负 = 看到左侧面, 正 = 看到右侧面)
+  drawScandinavianBlock(x, y, w, h, isRetro, idx, viewAngle) {
     this.ctx.save();
 
-    // 2.5D 透视参数：顶面偏移与右侧面宽度
-    const depthX = 10;  // 顶面向右偏移量
-    const depthY = 8;   // 顶面向上偏移量
-    const sideW = 10;   // 右侧面宽度
+    // 动态透视参数：根据视角偏转角计算侧面可见宽度与顶面偏移
+    const angle = viewAngle || 0;
+    const maxSideW = 14;    // 最大侧面宽度
+    const maxDepthY = 10;   // 最大顶面向上偏移
 
-    // 方块左上角坐标
+    // 侧面宽度随角度线性变化 (角度越大侧面越宽)
+    const sideW = Math.abs(Math.sin(angle)) * maxSideW;
+    // 顶面偏移方向：正角看到右侧 -> 顶面向右偏移
+    const depthDir = angle >= 0 ? 1 : -1;
+    const depthX = sideW * depthDir;
+    const depthY = Math.abs(Math.sin(angle)) * maxDepthY + 4; // 保底 4px 深度
+
+    // 方块左右边界
     const lx = x - w / 2;
     const rx = x + w / 2;
 
+    // ======= 复古模式 =======
     if (isRetro) {
-      // 复古 Game Boy 风格也加上 2.5D
-      // 右侧面
-      this.ctx.fillStyle = '#306230';
-      this.ctx.beginPath();
-      this.ctx.moveTo(rx, y);
-      this.ctx.lineTo(rx + sideW, y - depthY);
-      this.ctx.lineTo(rx + sideW, y + h - depthY);
-      this.ctx.lineTo(rx, y + h);
-      this.ctx.closePath();
-      this.ctx.fill();
-      this.ctx.strokeStyle = '#0f380f';
-      this.ctx.lineWidth = 2;
-      this.ctx.stroke();
-
+      // 侧面
+      if (sideW > 0.5) {
+        this.ctx.fillStyle = '#306230';
+        this.ctx.strokeStyle = '#0f380f';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        if (depthDir > 0) {
+          this.ctx.moveTo(rx, y); this.ctx.lineTo(rx + sideW, y - depthY);
+          this.ctx.lineTo(rx + sideW, y + h - depthY); this.ctx.lineTo(rx, y + h);
+        } else {
+          this.ctx.moveTo(lx, y); this.ctx.lineTo(lx - sideW, y - depthY);
+          this.ctx.lineTo(lx - sideW, y + h - depthY); this.ctx.lineTo(lx, y + h);
+        }
+        this.ctx.closePath(); this.ctx.fill(); this.ctx.stroke();
+      }
       // 顶面
       this.ctx.fillStyle = '#9bbc0f';
+      this.ctx.strokeStyle = '#0f380f';
+      this.ctx.lineWidth = 2;
       this.ctx.beginPath();
       this.ctx.moveTo(lx, y);
       this.ctx.lineTo(lx + depthX, y - depthY);
       this.ctx.lineTo(rx + depthX, y - depthY);
       this.ctx.lineTo(rx, y);
-      this.ctx.closePath();
-      this.ctx.fill();
-      this.ctx.stroke();
-
+      this.ctx.closePath(); this.ctx.fill(); this.ctx.stroke();
       // 正面
       this.ctx.fillStyle = '#8bac0f';
       this.ctx.fillRect(lx, y, w, h);
       this.ctx.strokeRect(lx, y, w, h);
-
-      // 复古双窗
-      const retroWinW = Math.max(8, Math.floor(w * 0.18));
-      const retroWinH = Math.max(12, Math.floor(h * 0.4));
+      // 窗户
+      const rWinW = Math.max(8, Math.floor(w * 0.18));
+      const rWinH = Math.max(12, Math.floor(h * 0.4));
       this.ctx.fillStyle = '#0f380f';
-      this.ctx.fillRect(x - retroWinW - 3, y + (h - retroWinH) / 2, retroWinW, retroWinH);
-      this.ctx.fillRect(x + 3, y + (h - retroWinH) / 2, retroWinW, retroWinH);
+      this.ctx.fillRect(x - rWinW - 3, y + (h - rWinH) / 2, rWinW, rWinH);
+      this.ctx.fillRect(x + 3, y + (h - rWinH) / 2, rWinW, rWinH);
       this.ctx.restore();
       return;
     }
 
-    // --- 诺基亚原版 2.5D 湖蓝建筑 (正面 + 顶面 + 右侧面) ---
-    const frontColor = '#00b4d8';   // 正面湖青蓝
-    const topColor = '#48cae4';     // 顶面亮青 (受光面)
-    const sideColor = '#0077b6';    // 右侧面深蓝 (背光面)
-    const outlineColor = '#03045e'; // 深蓝描边
-    const roofColor = '#ffc300';    // 黄色顶饰条
+    // ======= 诺基亚原版配色 =======
+    const frontColor = '#00b4d8';
+    const topColor = '#48cae4';
+    const sideColor = '#0077b6';
+    const outlineColor = '#03045e';
+    const roofColor = '#ffc300';
 
     this.ctx.strokeStyle = outlineColor;
     this.ctx.lineWidth = 2;
 
-    // 下落中的发光效果
+    // 下落发光
     if (idx === 999) {
       this.ctx.shadowBlur = 14;
       this.ctx.shadowColor = '#00f0ff';
     }
 
-    // ======= 第一层：右侧面 (深蓝背光面) =======
-    this.ctx.fillStyle = sideColor;
-    this.ctx.beginPath();
-    this.ctx.moveTo(rx, y);
-    this.ctx.lineTo(rx + sideW, y - depthY);
-    this.ctx.lineTo(rx + sideW, y + h - depthY);
-    this.ctx.lineTo(rx, y + h);
-    this.ctx.closePath();
-    this.ctx.fill();
-    this.ctx.stroke();
+    // ======= 1. 侧面 (动态方向：角度为正看右侧, 为负看左侧) =======
+    if (sideW > 0.5) {
+      this.ctx.fillStyle = sideColor;
+      this.ctx.beginPath();
+      if (depthDir > 0) {
+        // 看到右侧面
+        this.ctx.moveTo(rx, y);
+        this.ctx.lineTo(rx + sideW, y - depthY);
+        this.ctx.lineTo(rx + sideW, y + h - depthY);
+        this.ctx.lineTo(rx, y + h);
+      } else {
+        // 看到左侧面
+        this.ctx.moveTo(lx, y);
+        this.ctx.lineTo(lx - sideW, y - depthY);
+        this.ctx.lineTo(lx - sideW, y + h - depthY);
+        this.ctx.lineTo(lx, y + h);
+      }
+      this.ctx.closePath();
+      this.ctx.fill();
+      this.ctx.stroke();
+    }
 
-    // ======= 第二层：顶面 (亮青受光面) =======
+    // ======= 2. 顶面 (方向随角度动态倾斜) =======
     this.ctx.fillStyle = topColor;
     this.ctx.beginPath();
     this.ctx.moveTo(lx, y);
@@ -1696,70 +1716,72 @@ class TowerBloxxGame {
     this.ctx.fill();
     this.ctx.stroke();
 
-    // 顶面黄色饰条 (诺基亚标志性黄色屋顶条纹)
+    // 顶面黄色饰条 (窄条纹)
     this.ctx.fillStyle = roofColor;
     this.ctx.beginPath();
-    this.ctx.moveTo(lx, y);
-    this.ctx.lineTo(lx + depthX, y - depthY);
-    this.ctx.lineTo(lx + depthX + 6, y - depthY);
-    this.ctx.lineTo(lx + 6, y);
+    if (depthDir >= 0) {
+      this.ctx.moveTo(lx, y);
+      this.ctx.lineTo(lx + depthX, y - depthY);
+      this.ctx.lineTo(lx + depthX + 5, y - depthY);
+      this.ctx.lineTo(lx + 5, y);
+    } else {
+      this.ctx.moveTo(rx, y);
+      this.ctx.lineTo(rx + depthX, y - depthY);
+      this.ctx.lineTo(rx + depthX - 5, y - depthY);
+      this.ctx.lineTo(rx - 5, y);
+    }
     this.ctx.closePath();
     this.ctx.fill();
 
-    // ======= 第三层：正面 (主湖青蓝色面板) =======
+    // ======= 3. 正面 (湖青蓝主面板) =======
     this.ctx.shadowBlur = 0;
     this.ctx.fillStyle = frontColor;
     this.ctx.fillRect(lx, y, w, h);
     this.ctx.strokeRect(lx, y, w, h);
 
-    // 正面底部微妙渐变暗条 (增加立体层次)
+    // 正面渐变质感
     const gradFront = this.ctx.createLinearGradient(lx, y, lx, y + h);
-    gradFront.addColorStop(0, 'rgba(255,255,255,0.08)');
-    gradFront.addColorStop(0.5, 'rgba(0,0,0,0)');
-    gradFront.addColorStop(1, 'rgba(0,0,0,0.12)');
+    gradFront.addColorStop(0, 'rgba(255,255,255,0.1)');
+    gradFront.addColorStop(0.4, 'rgba(0,0,0,0)');
+    gradFront.addColorStop(1, 'rgba(0,0,0,0.15)');
     this.ctx.fillStyle = gradFront;
     this.ctx.fillRect(lx, y, w, h);
 
-    // 正面黄色顶饰条 (与顶面饰条对齐)
+    // 正面黄色顶饰条
     this.ctx.fillStyle = roofColor;
     this.ctx.strokeStyle = outlineColor;
     this.ctx.lineWidth = 1.5;
-    this.ctx.fillRect(lx - 2, y - 1, w + 4, 5);
-    this.ctx.strokeRect(lx - 2, y - 1, w + 4, 5);
+    this.ctx.fillRect(lx - 1, y - 1, w + 2, 5);
+    this.ctx.strokeRect(lx - 1, y - 1, w + 2, 5);
 
-    // ======= 第四层：正面双窗户 (1:1 诺基亚原版双窗格) =======
+    // ======= 4. 双窗户 =======
     const windowW = Math.max(10, Math.floor(w * 0.22));
     const windowH = Math.max(14, Math.floor(h * 0.45));
     const wy = y + (h - windowH) / 2 + 2;
-
-    // 左窗户
     this.drawSingleWindow(x - windowW - 3, wy, windowW, windowH, idx);
-    // 右窗户
     this.drawSingleWindow(x + 3, wy, windowW, windowH, idx + 1);
 
     this.ctx.restore();
   }
 
-  // 辅助函数：绘制单独的白色窗框与蓝色玻璃 (带 2.5D 高光反射)
+  // 辅助函数：窗户绘制 (带 2.5D 高光反射)
   drawSingleWindow(x, y, w, h, animationSeed) {
-    // 1. 白色外窗框
     this.ctx.fillStyle = '#ffffff';
     this.ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
     
-    // 2. 蓝色玻璃 (高楼亮灯效果)
     let glassColor = '#70a1ff';
     if (this.camera.y > 600 && animationSeed % 4 === 0) {
-      glassColor = '#ffd166';   // 亮灯的温馨夜窗
+      glassColor = '#ffd166';
     }
     
     this.ctx.fillStyle = glassColor;
     this.ctx.fillRect(x, y, w, h);
 
-    // 3. 玻璃高光反射条 (2.5D 光照效果)
+    // 玻璃高光反射条
     this.ctx.fillStyle = 'rgba(255,255,255,0.3)';
     this.ctx.fillRect(x, y, w * 0.35, h);
 
-    // 4. 田字窗格线
+    // 田字窗格线
     this.ctx.strokeStyle = '#ffffff';
     this.ctx.lineWidth = 1;
     this.ctx.beginPath();
@@ -1824,7 +1846,7 @@ class TowerBloxxGame {
     // 3. 绘制挂载中且未下落的方块
     if (!this.fallingBlock && this.state === 'PLAYING') {
       const block = this.swingingBlock;
-      this.drawScandinavianBlock(swingX, swingY + 25, block.w, block.h, isRetro, 999);
+      this.drawScandinavianBlock(swingX, swingY + 25, block.w, block.h, isRetro, 999, this.crane.angle);
     }
   }
 
