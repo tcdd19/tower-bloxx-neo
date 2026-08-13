@@ -5,6 +5,116 @@
  */
 
 // ==========================================================================
+// 0. 资源预加载系统
+// ==========================================================================
+class AssetLoader {
+  constructor() {
+    this.assets = {};
+    this.total = 0;
+  }
+  
+  loadAll(onComplete) {
+    const images = [
+      'crane_hook_frames', 'crane_boom_arm', 'building_spire', 'roof_red_variants', 'roof_yellow_variants',
+      'sprite_residents', 'ui_population_icon', 'bg_tree', 'bg_fence', 'bg_cloud_a', 'bg_cloud_b', 'bg_cloud_c',
+      'bg_mountains', 'bg_jet_plane', 'bg_propeller_plane', 'bg_flying_whales', 'space_moon', 'space_mars',
+      'space_saturn', 'space_neptune', 'space_glow', 'fx_dust_puff', 'fx_sparkle_star', 'fx_debris',
+      'fx_speed_lines', 'fx_wind_sway', 'badge_town', 'badge_city', 'badge_metropolis', 'badge_megacity',
+      'ui_drop_shadow', 'icon'
+    ];
+    this.total = images.length;
+    let loadedCount = 0;
+    if (this.total === 0) {
+      onComplete();
+      return;
+    }
+    
+    images.forEach(name => {
+      const img = new Image();
+      img.onload = () => {
+        loadedCount++;
+        if (loadedCount === this.total) onComplete();
+      };
+      img.onerror = () => {
+        console.warn('Failed to load asset: ' + name);
+        loadedCount++;
+        if (loadedCount === this.total) onComplete();
+      };
+      img.src = `assets/${name}.png`;
+      this.assets[name] = img;
+    });
+  }
+}
+
+class SpriteDustPuff {
+  constructor(x, y, scale) {
+    this.x = x;
+    this.y = y;
+    this.scale = scale;
+    this.frame = 0;
+    this.frameTimer = 0;
+    this.maxFrames = 6;
+    this.frameDuration = 80;
+    this.active = true;
+  }
+  update(dt) {
+    this.frameTimer += dt;
+    if (this.frameTimer >= this.frameDuration) {
+      this.frame++;
+      this.frameTimer = 0;
+      if (this.frame >= this.maxFrames) {
+        this.active = false;
+      }
+    }
+  }
+  draw(ctx, loader) {
+    if (!this.active) return;
+    const img = loader.assets['fx_dust_puff'];
+    if (img && img.complete) {
+      const fw = 31;
+      const fh = 31;
+      const sw = fw * this.scale;
+      const sh = fh * this.scale;
+      ctx.drawImage(img, this.frame * fw, 0, fw, fh, this.x - sw/2, this.y - sh/2, sw, sh);
+    }
+  }
+}
+
+class SparkleStar {
+  constructor(x, y, scale) {
+    this.x = x;
+    this.y = y;
+    this.scale = scale;
+    this.frame = 0;
+    this.frameTimer = 0;
+    this.maxFrames = 4;
+    this.frameDuration = 80;
+    this.active = true;
+  }
+  update(dt) {
+    this.frameTimer += dt;
+    if (this.frameTimer >= this.frameDuration) {
+      this.frame++;
+      this.frameTimer = 0;
+      if (this.frame >= this.maxFrames) {
+        this.active = false;
+      }
+    }
+  }
+  draw(ctx, loader) {
+    if (!this.active) return;
+    const img = loader.assets['fx_sparkle_star'];
+    if (img && img.complete) {
+      const fw = 22;
+      const fh = 22;
+      const sw = fw * this.scale;
+      const sh = fh * this.scale;
+      ctx.drawImage(img, this.frame * fw, 0, fw, fh, this.x - sw/2, this.y - sh/2, sw, sh);
+    }
+  }
+}
+
+// ==========================================================================
 // 1. 音效合成系统 (Web Audio API)
 // ==========================================================================
 class SoundSynth {
@@ -361,6 +471,12 @@ class TowerBloxxGame {
     this.canvas = document.getElementById('game-canvas');
     this.ctx = this.canvas.getContext('2d');
     
+    this.assetsLoaded = false;
+    this.loader = new AssetLoader();
+    this.spriteEffects = [];
+    this.jetX = -100;
+    this.propX = 480 + 100;
+
     // 初始化外设/粒子/漂浮文字
     this.synth = new SoundSynth();
     this.haptics = new HapticsController();
@@ -642,6 +758,7 @@ class TowerBloxxGame {
     this.collapseBlocks = [];
     this.particles.clear();
     this.floatingTexts = [];
+    this.spriteEffects = [];
     
     this.swingingBlock = {
       w: this.blockWidth,
@@ -860,6 +977,16 @@ class TowerBloxxGame {
 
     // 1. 粒子物理更新
     this.particles.update();
+    for (let i = this.spriteEffects.length - 1; i >= 0; i--) {
+      this.spriteEffects[i].update(dt);
+      if (!this.spriteEffects[i].active) {
+        this.spriteEffects.splice(i, 1);
+      }
+    }
+    this.jetX += 1.5 * dtFactor;
+    if (this.jetX > this.baseWidth + 200) this.jetX = -200;
+    this.propX -= 1.0 * dtFactor;
+    if (this.propX < -200) this.propX = this.baseWidth + 200;
 
     // 2. 漂浮文本更新
     for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
@@ -1038,6 +1165,11 @@ class TowerBloxxGame {
       }
     }
 
+    if (isPerfect) {
+      this.spriteEffects.push(new SparkleStar(landing.x, landingScreenY - landing.h/2, 2.5));
+    }
+    this.spriteEffects.push(new SpriteDustPuff(landing.x, landingScreenY, 2.5));
+
     // E4: 居民增加
     const popAdd = Math.floor(Math.random() * 50) + 30;
     this.population += popAdd;
@@ -1093,9 +1225,6 @@ class TowerBloxxGame {
     // 1. 渐进式背景 (Sunset Park -> Day Sky -> Stratosphere -> Outer Space)
     this.drawBackground();
 
-    // 1.5 诺基亚原版高楼背景剪影 (Vertical Skyscraper Silhouettes)
-    this.drawSkyscraperSilhouettes();
-
     // 2. 渲染云朵与星星 (带摄像机视差)
     this.drawParallaxStarsAndClouds();
 
@@ -1114,38 +1243,33 @@ class TowerBloxxGame {
     // 7. 绘制粒子
     this.particles.draw(this.ctx);
 
+    // 绘制基于 Sprite 的特效
+    this.spriteEffects.forEach(effect => effect.draw(this.ctx, this.loader));
+
     // 8. 绘制 Combo 漂浮文字
     this.floatingTexts.forEach(txt => txt.draw(this.ctx, 'Share Tech Mono', 'Outfit'));
 
+    // 9. 游戏结束成就徽章
+    if (this.state === 'GAMEOVER') {
+      let badgeName = 'badge_town';
+      if (this.tower.length >= 35) badgeName = 'badge_megacity';
+      else if (this.tower.length >= 20) badgeName = 'badge_metropolis';
+      else if (this.tower.length >= 10) badgeName = 'badge_city';
+
+      const badgeImg = this.loader.assets[badgeName];
+      if (badgeImg && badgeImg.complete) {
+        const bw = badgeImg.width * 2.5;
+        const bh = badgeImg.height * 2.5;
+        const bx = this.baseWidth / 2 - bw / 2;
+        const by = this.baseHeight / 5;
+        this.ctx.drawImage(badgeImg, bx, by, bw, bh);
+      }
+    }
+
     this.ctx.restore();
   }
 
-  // 绘制诺基亚原版背景高楼剪影
-  drawSkyscraperSilhouettes() {
-    if (this.theme === 'retro') return;
-    this.ctx.save();
-    this.ctx.globalAlpha = 0.16;
-    this.ctx.fillStyle = '#ffffff';
-
-    const buildings = [
-      { x: 15, w: 50, h: 700 },
-      { x: 80, w: 42, h: 760 },
-      { x: 135, w: 65, h: 620 },
-      { x: 215, w: 48, h: 840 },
-      { x: 280, w: 60, h: 680 },
-      { x: 355, w: 45, h: 790 },
-      { x: 415, w: 50, h: 650 }
-    ];
-
-    buildings.forEach(b => {
-      const drawY = this.baseHeight - b.h + this.camera.y * 0.15;
-      this.ctx.fillRect(b.x, drawY, b.w, b.h);
-      this.ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-      this.ctx.lineWidth = 1;
-      this.ctx.strokeRect(b.x, drawY, b.w, b.h);
-    });
-    this.ctx.restore();
-  }
+  drawBackground() {
     const isRetro = this.theme === 'retro';
     if (isRetro) {
       this.ctx.fillStyle = '#9bbc0f';
@@ -1159,22 +1283,18 @@ class TowerBloxxGame {
     let colorTop, colorBottom;
 
     if (altitude < 500) {
-      // 阶段 1：公园黄昏/早晨，明亮黄橙到淡蓝
       const factor = altitude / 500;
-      colorTop = this.interpolateColor('#82ccdd', '#60a3bc', factor);      // 天蓝过渡到深蓝
-      colorBottom = this.interpolateColor('#fad390', '#f6b93b', factor);   // 温暖黄橙过渡到中度橙
+      colorTop = this.interpolateColor('#82ccdd', '#60a3bc', factor);
+      colorBottom = this.interpolateColor('#fad390', '#f6b93b', factor);
     } else if (altitude < 1200) {
-      // 阶段 2：万里晴空，中蓝到天蓝
       const factor = (altitude - 500) / 700;
-      colorTop = this.interpolateColor('#60a3bc', '#0c2461', factor);      // 深蓝过渡到幽暗藏蓝
-      colorBottom = this.interpolateColor('#f6b93b', '#60a3bc', factor);   // 橙色彻底转成明蓝
+      colorTop = this.interpolateColor('#60a3bc', '#0c2461', factor);
+      colorBottom = this.interpolateColor('#f6b93b', '#60a3bc', factor);
     } else if (altitude < 2200) {
-      // 阶段 3：平流层，极深蓝到暗黑
       const factor = (altitude - 1200) / 1000;
-      colorTop = this.interpolateColor('#0c2461', '#0a0d1a', factor);      // 幽暗藏蓝过渡到太空黑
-      colorBottom = this.interpolateColor('#60a3bc', '#0c2461', factor);   // 明蓝过渡到深蓝
+      colorTop = this.interpolateColor('#0c2461', '#0a0d1a', factor);
+      colorBottom = this.interpolateColor('#60a3bc', '#0c2461', factor);
     } else {
-      // 阶段 4：纯黑深空，偶尔带有紫气星云
       const factor = Math.min(1.0, (altitude - 2200) / 1500);
       colorTop = this.interpolateColor('#0a0d1a', '#020205', factor);
       colorBottom = this.interpolateColor('#0c2461', '#06070c', factor);
@@ -1186,6 +1306,61 @@ class TowerBloxxGame {
 
     this.ctx.fillStyle = grad;
     this.ctx.fillRect(0, 0, this.baseWidth, this.baseHeight);
+
+    this.ctx.save();
+    
+    this.drawSpriteWithParallax('bg_flying_whales', this.baseWidth / 2, 4000, 0.05, 2.0);
+    this.drawSpriteWithParallax('space_neptune', 350, 4500, 0.1, 2.0);
+    this.drawSpriteWithParallax('space_saturn', 100, 3500, 0.1, 2.0);
+    this.drawSpriteWithParallax('space_mars', 400, 2500, 0.1, 2.0);
+    this.drawSpriteWithParallax('space_moon', 80, 1800, 0.1, 2.0);
+
+    this.drawSpriteWithParallax('bg_cloud_c', 150, 600, 0.2, 2.5);
+    this.drawSpriteWithParallax('bg_cloud_b', 350, 800, 0.25, 2.5);
+    this.drawSpriteWithParallax('bg_cloud_a', 100, 1000, 0.3, 2.5);
+    
+    if (altitude > 400 && altitude < 1200) {
+      const jetY = this.baseHeight - 800 + altitude * 0.4;
+      const img = this.loader.assets['bg_jet_plane'];
+      if (img && img.complete) {
+        this.ctx.drawImage(img, this.jetX, jetY, 45 * 2.5, 14 * 2.5);
+      }
+    }
+
+    if (altitude > 200 && altitude < 800) {
+      const propY = this.baseHeight - 500 + altitude * 0.4;
+      const img = this.loader.assets['bg_propeller_plane'];
+      if (img && img.complete) {
+        this.ctx.drawImage(img, this.propX, propY, 103 * 2.5, 9 * 2.5);
+      }
+    }
+
+    if (altitude < 1000) {
+      const mntImg = this.loader.assets['bg_mountains'];
+      if (mntImg && mntImg.complete) {
+        const mntW = 59 * 3;
+        const mntH = 12 * 3;
+        const mntY = this.baseHeight - 120 - mntH + altitude * 0.3;
+        for (let x = -50; x < this.baseWidth + 50; x += mntW) {
+          this.ctx.drawImage(mntImg, x, mntY, mntW, mntH);
+        }
+      }
+    }
+
+    this.ctx.restore();
+  }
+
+  drawSpriteWithParallax(name, worldX, worldY, parallaxFactor, scale) {
+    const scrollY = this.camera.y;
+    const groundY = this.baseHeight - 120;
+    const drawY = groundY - worldY + scrollY * (1 - parallaxFactor); 
+    
+    if (drawY < -200 || drawY > this.baseHeight + 200) return;
+
+    const img = this.loader.assets[name];
+    if (img && img.complete) {
+      this.ctx.drawImage(img, worldX - (img.width * scale)/2, drawY, img.width * scale, img.height * scale);
+    }
   }
 
   // A5+D1: 颜色插值优化（钳位 + 减少 GC 分配）
@@ -1196,40 +1371,36 @@ class TowerBloxxGame {
     return `rgb(${Math.round(r1+(r2-r1)*factor)},${Math.round(g1+(g2-g1)*factor)},${Math.round(b1+(b2-b1)*factor)})`;
   }
 
-  // 绘制公园树木剪影 (随镜头推移向屏幕下方滑出)
   drawParkSilhouettes() {
     if (this.theme === 'retro') return;
 
-    // 树木在世界坐标系底部，在 canvas 的屏幕 Y 坐标为 tree.y - camera.y
     const scrollY = this.camera.y;
-    // 如果已经滑出屏幕底部 100px 以上，就跳过绘制 (优化)
     if (scrollY > this.baseHeight + 50) return;
 
     this.ctx.save();
-    // 渲染渐隐系数：随着高度升高，公园景象逐渐模糊淡出
     const alpha = Math.max(0, 1.0 - scrollY / 450);
     this.ctx.globalAlpha = alpha;
 
-    this.parkTrees.forEach(tree => {
-      const drawY = tree.y + scrollY; // 【镜头向上滚动】：世界物体在屏幕上的 Y 应为 y + camera.y (因为世界Y是向下的，地面向下移)
-      
-      this.ctx.fillStyle = tree.color;
-      this.ctx.beginPath();
-      // 绘制松树冷杉针叶塔状图形
-      this.ctx.moveTo(tree.x, drawY - tree.h);
-      this.ctx.lineTo(tree.x - tree.w / 2, drawY - tree.h * 0.3);
-      this.ctx.lineTo(tree.x - tree.w / 4, drawY - tree.h * 0.35);
-      this.ctx.lineTo(tree.x - tree.w * 0.7, drawY);
-      this.ctx.lineTo(tree.x + tree.w * 0.7, drawY);
-      this.ctx.lineTo(tree.x + tree.w / 4, drawY - tree.h * 0.35);
-      this.ctx.lineTo(tree.x + tree.w / 2, drawY - tree.h * 0.3);
-      this.ctx.closePath();
-      this.ctx.fill();
+    const groundY = this.baseHeight - 120;
+    const drawY = groundY + scrollY; 
 
-      // 树干
-      this.ctx.fillStyle = '#3e2723';
-      this.ctx.fillRect(tree.x - 4, drawY - 2, 8, 12);
-    });
+    const fenceImg = this.loader.assets['bg_fence'];
+    if (fenceImg && fenceImg.complete) {
+      const fW = 33 * 2.5;
+      const fH = 34 * 2.5;
+      for (let x = 0; x < this.baseWidth; x += fW) {
+        this.ctx.drawImage(fenceImg, x, drawY - fH, fW, fH);
+      }
+    }
+
+    const treeImg = this.loader.assets['bg_tree'];
+    if (treeImg && treeImg.complete) {
+      const tW = 51 * 2.5;
+      const tH = 48 * 2.5;
+      this.parkTrees.forEach(tree => {
+        this.ctx.drawImage(treeImg, tree.x - tW/2, drawY - tH + 5, tW, tH);
+      });
+    }
 
     this.ctx.restore();
   }
@@ -1337,33 +1508,45 @@ class TowerBloxxGame {
       const topX = topBlock.x + topSway;
       const topY = groundY - (topIdx + 1) * topBlock.h + this.camera.y;
 
-      this.ctx.save();
-      // 尖顶红三角
-      this.ctx.fillStyle = isRetro ? '#0f380f' : '#ff6b6b';
-      this.ctx.beginPath();
-      this.ctx.moveTo(topX - 14, topY);
-      this.ctx.lineTo(topX, topY - 20);
-      this.ctx.lineTo(topX + 14, topY);
-      this.ctx.closePath();
-      this.ctx.fill();
+      const isRed = this.tower.length % 2 === 0;
+      const variant = this.tower.length % 4;
+      const roofName = isRed ? 'roof_red_variants' : 'roof_yellow_variants';
+      const roofImg = this.loader.assets[roofName];
+      
+      if (roofImg && roofImg.complete && !isRetro && this.tower.length > 2) {
+        const fw = isRed ? 22 : 25;
+        const fh = isRed ? 22 : 25;
+        const scale = topBlock.w / fw; 
+        this.ctx.drawImage(roofImg, variant * fw, 0, fw, fh, topX - topBlock.w/2, topY - fh * scale, fw * scale, fh * scale);
+      } else {
+        this.ctx.save();
+        // 尖顶红三角
+        this.ctx.fillStyle = isRetro ? '#0f380f' : '#ff6b6b';
+        this.ctx.beginPath();
+        this.ctx.moveTo(topX - 14, topY);
+        this.ctx.lineTo(topX, topY - 20);
+        this.ctx.lineTo(topX + 14, topY);
+        this.ctx.closePath();
+        this.ctx.fill();
 
-      // 旗杆
-      this.ctx.strokeStyle = isRetro ? '#0f380f' : '#2c3e50';
-      this.ctx.lineWidth = 2;
-      this.ctx.beginPath();
-      this.ctx.moveTo(topX, topY - 20);
-      this.ctx.lineTo(topX, topY - 36);
-      this.ctx.stroke();
+        // 旗杆
+        this.ctx.strokeStyle = isRetro ? '#0f380f' : '#2c3e50';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.moveTo(topX, topY - 20);
+        this.ctx.lineTo(topX, topY - 36);
+        this.ctx.stroke();
 
-      // 飘扬红旗
-      this.ctx.fillStyle = isRetro ? '#8bac0f' : '#ffd166';
-      this.ctx.beginPath();
-      this.ctx.moveTo(topX, topY - 36);
-      this.ctx.lineTo(topX + 12, topY - 30);
-      this.ctx.lineTo(topX, topY - 24);
-      this.ctx.closePath();
-      this.ctx.fill();
-      this.ctx.restore();
+        // 飘扬红旗
+        this.ctx.fillStyle = isRetro ? '#8bac0f' : '#ffd166';
+        this.ctx.beginPath();
+        this.ctx.moveTo(topX, topY - 36);
+        this.ctx.lineTo(topX + 12, topY - 30);
+        this.ctx.lineTo(topX, topY - 24);
+        this.ctx.closePath();
+        this.ctx.fill();
+        this.ctx.restore();
+      }
     }
   }
 
@@ -1512,55 +1695,50 @@ class TowerBloxxGame {
     this.ctx.stroke();
   }
 
-  // 绘制诺基亚原版吊架与高悬钢索
   drawCrane() {
     const isRetro = this.theme === 'retro';
     
-    // 诺基亚原版悬挂轴心
     const trolleyX = this.baseWidth / 2 + Math.sin(this.crane.angle) * 22;
     const currentRopeLen = this.crane.length + this.crane.ropeStretch;
     
-    // 绳爪连接顶端的世界 X, Y
     const swingX = trolleyX + Math.sin(this.crane.angle) * currentRopeLen;
     const swingY = this.crane.pivotY + Math.cos(this.crane.angle) * currentRopeLen;
 
     this.ctx.save();
 
-    // 1. 诺基亚原版高悬深色吊绳 (从屏幕顶部外延伸向下)
+    if (!isRetro) {
+      const boomImg = this.loader.assets['crane_boom_arm'];
+      if (boomImg && boomImg.complete) {
+        const boomW = 169 * 2.5;
+        const boomH = 10 * 2.5;
+        this.ctx.drawImage(boomImg, this.baseWidth / 2 - boomW / 2, this.crane.pivotY - 20, boomW, boomH);
+      }
+    }
+
     this.ctx.strokeStyle = isRetro ? '#0f380f' : '#1e293b';
     this.ctx.lineWidth = isRetro ? 3.5 : 3;
     this.ctx.beginPath();
-    this.ctx.moveTo(trolleyX, -30);
+    this.ctx.moveTo(trolleyX, this.crane.pivotY - 15);
     this.ctx.lineTo(swingX, swingY);
     this.ctx.stroke();
 
-    // 2. 吊绳与方块顶部的连接挂钩/夹爪
     if (!isRetro) {
-      this.ctx.save();
-      this.ctx.translate(swingX, swingY);
-      this.ctx.rotate(this.crane.angle);
+      const hookImg = this.loader.assets['crane_hook_frames'];
+      if (hookImg && hookImg.complete) {
+        this.ctx.save();
+        this.ctx.translate(swingX, swingY);
+        const totalFrames = 5;
+        let normalizedAngle = (this.crane.angle + this.crane.angleRange) / (2 * this.crane.angleRange);
+        normalizedAngle = Math.max(0, Math.min(1, normalizedAngle));
+        let frameIndex = Math.floor(normalizedAngle * totalFrames);
+        if (frameIndex >= totalFrames) frameIndex = totalFrames - 1;
 
-      // 金属连接环/夹爪
-      this.ctx.fillStyle = '#334155';
-      this.ctx.strokeStyle = '#0f172a';
-      this.ctx.lineWidth = 2;
-      this.ctx.fillRect(-8, -4, 16, 8);
-      this.ctx.strokeRect(-8, -4, 16, 8);
-
-      // 双挂钩爪臂
-      const spread = this.crane.clawSpread || 0;
-      this.ctx.strokeStyle = '#475569';
-      this.ctx.lineWidth = 3.5;
-      this.ctx.lineCap = 'round';
-
-      this.ctx.beginPath();
-      this.ctx.moveTo(-6, 4);
-      this.ctx.lineTo(-12 - spread, 18);
-      this.ctx.moveTo(6, 4);
-      this.ctx.lineTo(12 + spread, 18);
-      this.ctx.stroke();
-
-      this.ctx.restore();
+        const fw = 22;
+        const fh = 19;
+        const scale = 2.5;
+        this.ctx.drawImage(hookImg, frameIndex * fw, 0, fw, fh, -fw*scale/2, -fh*scale/2 + 10, fw*scale, fh*scale);
+        this.ctx.restore();
+      }
     } else {
       this.ctx.fillStyle = '#0f380f';
       this.ctx.fillRect(swingX - 4, swingY - 2, 8, 6);
@@ -1571,7 +1749,7 @@ class TowerBloxxGame {
     // 3. 绘制挂载中且未下落的方块
     if (!this.fallingBlock && this.state === 'PLAYING') {
       const block = this.swingingBlock;
-      this.drawScandinavianBlock(swingX, swingY + 12, block.w, block.h, isRetro, 999);
+      this.drawScandinavianBlock(swingX, swingY + 25, block.w, block.h, isRetro, 999);
     }
   }
 
@@ -1618,7 +1796,7 @@ class TowerBloxxGame {
   // 主循环
   loop(timestamp) {
     // D2: 页面隐藏时暂停逻辑
-    if (this._pageHidden) {
+    if (this._pageHidden || !this.assetsLoaded) {
       requestAnimationFrame(this.loop);
       return;
     }
@@ -1637,6 +1815,9 @@ class TowerBloxxGame {
 function initGameEngine() {
   if (!window.gameInstance) {
     window.gameInstance = new TowerBloxxGame();
+    window.gameInstance.loader.loadAll(() => {
+      window.gameInstance.assetsLoaded = true;
+    });
   }
 }
 
