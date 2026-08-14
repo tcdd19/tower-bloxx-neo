@@ -999,8 +999,8 @@ class TowerBloxxGame {
     // 性能优化：渐变/颜色缓存
     this._gradientCache = {};
 
-    // 屏幕自适应
-    this.dpr = window.devicePixelRatio || 1;
+    // 屏幕自适应 (PC 端高分屏限制最大 1.5x DPR，避免 4K 屏过载渲染，大幅提升 60FPS 流畅度)
+    this.dpr = Math.min(window.devicePixelRatio || 1, 1.5);
     this.baseWidth = 480;
     this.baseHeight = 850;
     
@@ -1928,54 +1928,76 @@ class TowerBloxxGame {
     // 【Zone 8: 6500+ 银河系外与漩涡星系 (Spiral Galaxy)】
     if (altitude > 5500) {
       const galY = this.baseHeight - 7500 + altitude * 0.92;
-      this.drawHDVectorSpiralGalaxy(360, galY, 65);
+      if (galY >= -150 && galY <= this.baseHeight + 150) {
+        this.drawHDVectorSpiralGalaxy(360, galY, 65);
+      }
     }
 
     // 【Zone 7: 4500 ~ 6500 深空引力透镜黑洞与外星人 UFO】
     if (altitude > 4200) {
       const bhY = this.baseHeight - 6200 + altitude * 0.9;
-      this.drawHDVectorBlackHole(95, bhY, 42);
+      if (bhY >= -150 && bhY <= this.baseHeight + 150) {
+        this.drawHDVectorBlackHole(95, bhY, 42);
+      }
 
       const ufoY = this.baseHeight - 5100 + altitude * 0.9;
-      this.drawHDVectorUFO(320, ufoY);
+      if (ufoY >= -150 && ufoY <= this.baseHeight + 150) {
+        this.drawHDVectorUFO(320, ufoY);
+      }
     }
 
     // 【Zone 6: 3000 ~ 4800 太阳耀斑与深空发光神鲸】
     if (altitude > 2600) {
       const sunY = this.baseHeight - 4400 + altitude * 0.88;
-      this.drawHDVectorSun(380, sunY, 48);
+      if (sunY >= -150 && sunY <= this.baseHeight + 150) {
+        this.drawHDVectorSun(380, sunY, 48);
+      }
 
       const whaleY = this.baseHeight - 3600 + altitude * 0.88;
-      this.drawHDVectorSpaceWhale(this.baseWidth / 2, whaleY);
+      if (whaleY >= -150 && whaleY <= this.baseHeight + 150) {
+        this.drawHDVectorSpaceWhale(this.baseWidth / 2, whaleY);
+      }
     }
 
     // 【Zone 5: 1800 ~ 3500 高空行星】超高清矢量海王星与 3D 光环土星
     if (altitude > 1600) {
       const nepY = this.baseHeight - 4000 + altitude * 0.85;
-      this.drawHDVectorNeptune(350, nepY, 28);
+      if (nepY >= -150 && nepY <= this.baseHeight + 150) {
+        this.drawHDVectorNeptune(350, nepY, 28);
+      }
 
       const satY = this.baseHeight - 3000 + altitude * 0.85;
-      this.drawHDVectorSaturn(110, satY, 32);
+      if (satY >= -150 && satY <= this.baseHeight + 150) {
+        this.drawHDVectorSaturn(110, satY, 32);
+      }
     }
 
     // 【Zone 4: 1000 ~ 2400 近地轨道】超高清矢量月球与火星
     if (altitude > 800) {
       const marsY = this.baseHeight - 2400 + altitude * 0.8;
-      this.drawHDVectorMars(390, marsY, 26);
+      if (marsY >= -150 && marsY <= this.baseHeight + 150) {
+        this.drawHDVectorMars(390, marsY, 26);
+      }
 
       const moonY = this.baseHeight - 1700 + altitude * 0.8;
-      this.drawHDVectorMoon(85, moonY, 38);
+      if (moonY >= -150 && moonY <= this.baseHeight + 150) {
+        this.drawHDVectorMoon(85, moonY, 38);
+      }
     }
 
     // 【Zone 2: 300 ~ 1200 城市高空区】超高清矢量喷气客机与复古双翼飞机
     if (altitude > 400 && altitude < 1400) {
       const jetY = this.baseHeight - 850 + altitude * 0.45;
-      this.drawHDVectorJet(this.jetX, jetY);
+      if (jetY >= -150 && jetY <= this.baseHeight + 150) {
+        this.drawHDVectorJet(this.jetX, jetY);
+      }
     }
 
     if (altitude > 150 && altitude < 900) {
       const propY = this.baseHeight - 520 + altitude * 0.45;
-      this.drawHDVectorBiplane(this.propX, propY);
+      if (propY >= -150 && propY <= this.baseHeight + 150) {
+        this.drawHDVectorBiplane(this.propX, propY);
+      }
     }
 
     // 【Zone 1: 0 ~ 300 地表远景天际线】远景 HD 2.5D 现代摩天大楼剪影
