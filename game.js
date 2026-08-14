@@ -1436,24 +1436,26 @@ class TowerBloxxGame {
 
     // 掉落判定限制 (第一层地基绝对安全，允许随意摆放)
     if (this.tower.length > 0) {
-      const maxOffset = landing.w * 0.8;
+      const maxOffset = landing.w * 0.65;
       if (Math.abs(dx) >= maxOffset) {
         const groundY = this.baseHeight - 120;
         const landingScreenY = groundY - landing.y + this.camera.y;
 
-        // 产生放偏失误直接翻滚坠落出屏幕下边缘的物理方块 (画面连贯性极强!)
+        // 没对准放偏：直接翻滚脱落，一路疾速坠落出屏幕最底端！
         this.collapseBlocks.push({
           x: landing.x,
           y: landingScreenY,
           w: landing.w,
           h: landing.h,
-          vx: dx > 0 ? 6.5 : -6.5,
-          vy: -3,
-          rot: 0,
-          vr: dx > 0 ? 0.2 : -0.2
+          vx: dx > 0 ? 6.0 : -6.0,
+          vy: Math.max(3.5, (landing.vy || 4) * 0.6), // 继承下落速度并继续加速下坠
+          rot: landing.angle || 0,
+          vr: dx > 0 ? 0.18 : -0.18
         });
 
-        this.loseLife("方块没有对准，直接从楼顶坠落了！");
+        this.loseLife("方块完全没有对准，直接从高空坠落到底！");
+        this.triggerShake(10, 14);
+        this.floatingTexts.push(new FloatingText(landing.x, landingScreenY - 20, "MISSED!", '#ef4444', true));
         return;
       }
     }
@@ -1513,46 +1515,28 @@ class TowerBloxxGame {
       const particleColor = this.theme === 'retro' ? '#306230' : '#d2dae2';
       this.particles.emit(landing.x, landingScreenY, particleColor, 10, this.theme === 'retro');
 
-      // 歪楼砸倒判定 (严重偏移时砸毁顶层 1-3 层楼房)
-      if (this.tower.length > 0 && Math.abs(dx) > landing.w * 0.52) {
-        // 本次下落的楼块翻滚坠落
+      // 没放稳严重偏移判定 (重心不稳直接滑脱，沿楼体侧面一路翻滚坠落到屏幕最底端)
+      if (this.tower.length > 0 && Math.abs(dx) > landing.w * 0.45) {
+        const groundY = this.baseHeight - 120;
+        const landingScreenY = groundY - landing.y + this.camera.y;
+
+        // 本次没放稳的楼块直接翻滚滑落，一路坠落至屏幕最下方
         this.collapseBlocks.push({
           x: landing.x,
           y: landingScreenY,
           w: landing.w,
           h: landing.h,
-          vx: dx > 0 ? 8 : -8,
-          vy: -4,
-          rot: 0,
-          vr: dx > 0 ? 0.25 : -0.25
+          vx: dx > 0 ? 6.5 : -6.5,
+          vy: 2.0,
+          rot: landing.angle || 0,
+          vr: dx > 0 ? 0.22 : -0.22
         });
 
-        this.loseLife("房子撞击严重，导致顶楼崩塌！");
-        
-        // 随机砸毁 1~3 层已盖好的楼层！
-        const smashCount = Math.min(this.tower.length, Math.floor(Math.random() * 3) + 1);
-        for (let s = 0; s < smashCount; s++) {
-          const removed = this.tower.pop();
-          if (removed) {
-            // 产生砸碎的楼层崩塌碎片
-            this.collapseBlocks.push({
-              x: removed.x,
-              y: groundY - removed.y + this.camera.y,
-              w: removed.w,
-              h: removed.h,
-              vx: (Math.random() - 0.5) * 12 + (dx > 0 ? 8 : -8),
-              vy: -4 - Math.random() * 5,
-              rot: 0,
-              vr: (Math.random() - 0.5) * 0.35
-            });
-          }
-        }
-        
-        // 剧烈砸楼震屏与爆炸粒子烟尘
-        this.triggerShake(16, 25);
-        this.particles.emit(landing.x, landingScreenY, '#ef4444', 35, this.theme === 'retro');
+        this.loseLife("房子没放稳失去平衡，从楼顶翻滚坠落了！");
+        this.triggerShake(12, 18);
+        this.particles.emit(landing.x, landingScreenY, '#ef4444', 25, this.theme === 'retro');
         this.particles.emitDust(landing.x, landingScreenY, '#64748b', this.theme === 'retro');
-        this.floatingTexts.push(new FloatingText(landing.x, landingScreenY - 30, `砸毁 ${smashCount} 层楼!`, '#ef4444', true));
+        this.floatingTexts.push(new FloatingText(landing.x, landingScreenY - 20, "UNSTABLE!", '#ef4444', true));
         return;
       }
     }
@@ -1642,6 +1626,9 @@ class TowerBloxxGame {
 
     // 4. 绘制叠好的黄色北欧楼体
     this.drawTower();
+
+    // 4.5 绘制没放稳/滑脱翻滚坠落到底端的方块
+    this.drawCollapseBlocks();
 
     // 5. 绘制坠落中的黄色楼层
     this.drawFallingBlock();
@@ -2547,18 +2534,6 @@ class TowerBloxxGame {
     const isRetro = this.theme === 'retro';
     const groundY = this.baseHeight - 120;
 
-    // E2: 游戏结束倒塌状态渲染
-    if (this.state === 'GAMEOVER' && this.collapseBlocks.length > 0) {
-      this.collapseBlocks.forEach((block, idx) => {
-        this.ctx.save();
-        this.ctx.translate(block.x, block.y);
-        this.ctx.rotate(block.rot);
-        this.drawScandinavianBlock(0, 0, block.w, block.h, isRetro, idx);
-        this.ctx.restore();
-      });
-      return;
-    }
-
     // 地基平台 (地表) 渲染
     this.ctx.save();
     this.ctx.fillStyle = isRetro ? '#0f380f' : '#27ae60';
@@ -2723,6 +2698,20 @@ class TowerBloxxGame {
     this.ctx.rotate(block.angle || 0);
     this.drawScandinavianBlock(0, -block.h / 2, block.w, block.h, isRetro, 999, 0);
     this.ctx.restore();
+  }
+
+  // 绘制没放稳/失稳坠落到底端的物理方块 (支持实时翻滚、重力下坠全过程渲染)
+  drawCollapseBlocks() {
+    if (!this.collapseBlocks || this.collapseBlocks.length === 0) return;
+    const isRetro = this.theme === 'retro';
+    for (let i = 0; i < this.collapseBlocks.length; i++) {
+      const block = this.collapseBlocks[i];
+      this.ctx.save();
+      this.ctx.translate(block.x, block.y);
+      this.ctx.rotate(block.rot || 0);
+      this.drawScandinavianBlock(0, 0, block.w, block.h, isRetro, 999, block.rot || 0);
+      this.ctx.restore();
+    }
   }
 
   // 绘制诺基亚原版 2.5D 伪立体建筑单元 (走心与精致渲染)
