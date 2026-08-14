@@ -49,6 +49,214 @@ class AssetLoader {
   }
 }
 
+// ==========================================================================
+// 方案 1：建筑电焊火花 + 接缝瞬间强光 + 扁平横向冲击波特效系统
+// ==========================================================================
+
+// 1. 接触缝隙瞬间高亮锁合光束 (Seam Contact Flash)
+class ContactSeamFlash {
+  constructor(x, y, width, isPerfect = false, themeRetro = false) {
+    this.x = x;
+    this.y = y;
+    this.w = width;
+    this.isPerfect = isPerfect;
+    this.themeRetro = themeRetro;
+    this.timer = 0;
+    this.duration = isPerfect ? 220 : 160;
+    this.active = true;
+  }
+
+  update(dt) {
+    this.timer += dt;
+    if (this.timer >= this.duration) {
+      this.active = false;
+    }
+  }
+
+  draw(ctx) {
+    if (!this.active || this.themeRetro) return;
+    const progress = this.timer / this.duration;
+    const alpha = Math.sin((1 - progress) * (Math.PI / 2));
+    const halfW = (this.w / 2) * (1 + progress * 0.25);
+
+    ctx.save();
+    const grad = ctx.createLinearGradient(this.x - halfW, this.y, this.x + halfW, this.y);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+    grad.addColorStop(0.2, this.isPerfect ? `rgba(255, 209, 102, ${alpha * 0.85})` : `rgba(56, 189, 248, ${alpha * 0.75})`);
+    grad.addColorStop(0.5, `rgba(255, 255, 255, ${alpha * 0.98})`);
+    grad.addColorStop(0.8, this.isPerfect ? `rgba(255, 209, 102, ${alpha * 0.85})` : `rgba(56, 189, 248, ${alpha * 0.75})`);
+    grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(this.x - halfW, this.y - 2.5, halfW * 2, 5);
+    ctx.restore();
+  }
+}
+
+// 2. 接触冲击扁平扩散气浪光环 (Impact Shockwave Ring)
+class ImpactShockwave {
+  constructor(x, y, width, isPerfect = false, themeRetro = false) {
+    this.x = x;
+    this.y = y;
+    this.baseW = width;
+    this.isPerfect = isPerfect;
+    this.themeRetro = themeRetro;
+    this.timer = 0;
+    this.duration = isPerfect ? 340 : 240;
+    this.active = true;
+  }
+
+  update(dt) {
+    this.timer += dt;
+    if (this.timer >= this.duration) {
+      this.active = false;
+    }
+  }
+
+  draw(ctx) {
+    if (!this.active) return;
+    const progress = this.timer / this.duration;
+    const alpha = Math.max(0, 1 - progress);
+    const radiusX = (this.baseW * 0.45) + (this.baseW * (this.isPerfect ? 0.95 : 0.65)) * progress;
+    const radiusY = (this.isPerfect ? 6 : 4) + (this.isPerfect ? 15 : 10) * progress;
+
+    ctx.save();
+    if (this.themeRetro) {
+      ctx.strokeStyle = '#0f380f';
+      ctx.lineWidth = Math.max(1, 3 * (1 - progress));
+      ctx.beginPath();
+      ctx.ellipse(this.x, this.y, radiusX, radiusY, 0, 0, TWO_PI);
+      ctx.stroke();
+    } else {
+      ctx.shadowBlur = this.isPerfect ? 16 * alpha : 8 * alpha;
+      ctx.shadowColor = this.isPerfect ? '#ffd166' : '#38bdf8';
+
+      // 外圈光晕冲击环
+      ctx.strokeStyle = this.isPerfect
+        ? `rgba(255, 209, 102, ${alpha * 0.95})`
+        : `rgba(56, 189, 248, ${alpha * 0.85})`;
+      ctx.lineWidth = Math.max(1.2, (this.isPerfect ? 4.0 : 2.5) * (1 - progress * 0.6));
+      ctx.beginPath();
+      ctx.ellipse(this.x, this.y, radiusX, radiusY, 0, 0, TWO_PI);
+      ctx.stroke();
+
+      // 内圈核心高亮亮线
+      if (this.isPerfect && progress < 0.6) {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${(1 - progress / 0.6) * 0.9})`;
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.ellipse(this.x, this.y, radiusX * 0.75, radiusY * 0.75, 0, 0, TWO_PI);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+}
+
+// 3. 钢结构接缝电焊铆接火花特效 (Welding Sparks & Embers)
+class WeldingSparkEmitter {
+  constructor(x, y, width, isPerfect = false, themeRetro = false) {
+    this.x = x;
+    this.y = y;
+    this.active = true;
+    this.timer = 0;
+    this.duration = 450;
+    this.sparks = [];
+    this.themeRetro = themeRetro;
+
+    const count = isPerfect ? 28 : 16;
+    const halfW = width / 2;
+
+    for (let i = 0; i < count; i++) {
+      const originType = i % 3; // 0: 左侧角, 1: 右侧角, 2: 中间结合部
+      let spawnX = x;
+      let dirX = (Math.random() - 0.5) * 4;
+
+      if (originType === 0) {
+        spawnX = x - halfW + (Math.random() - 0.5) * 6;
+        dirX = -2.5 - Math.random() * 5.0; // 强劲向左喷射
+      } else if (originType === 1) {
+        spawnX = x + halfW + (Math.random() - 0.5) * 6;
+        dirX = 2.5 + Math.random() * 5.0; // 强劲向右喷射
+      } else {
+        spawnX = x + (Math.random() - 0.5) * (width * 0.6);
+        dirX = (Math.random() - 0.5) * 6.0;
+      }
+
+      const vy = -1.5 - Math.random() * 4.5;
+      const speed = Math.sqrt(dirX * dirX + vy * vy);
+
+      this.sparks.push({
+        x: spawnX,
+        y: y,
+        vx: dirX,
+        vy: vy,
+        length: Math.max(3, speed * 1.6),
+        color: themeRetro
+          ? '#0f380f'
+          : (isPerfect
+              ? (Math.random() > 0.3 ? '#fff7ed' : '#ffd166')
+              : (Math.random() > 0.4 ? '#fef08a' : '#f97316')),
+        alpha: 1.0,
+        decay: Math.random() * 0.028 + 0.022,
+        size: Math.random() * 1.5 + 1.2
+      });
+    }
+  }
+
+  update(dt) {
+    this.timer += dt;
+    if (this.timer >= this.duration) {
+      this.active = false;
+      return;
+    }
+    const dtFactor = Math.min(dt / 16.66, 3.0);
+    let alive = 0;
+
+    for (let i = 0; i < this.sparks.length; i++) {
+      const s = this.sparks[i];
+      if (s.alpha <= 0) continue;
+      alive++;
+      s.x += s.vx * dtFactor;
+      s.y += s.vy * dtFactor;
+      s.vy += 0.28 * dtFactor; // 重力加速度
+      s.vx *= Math.pow(0.96, dtFactor);
+      s.alpha -= s.decay * dtFactor;
+    }
+    if (alive === 0) this.active = false;
+  }
+
+  draw(ctx) {
+    if (!this.active) return;
+    ctx.save();
+    for (let i = 0; i < this.sparks.length; i++) {
+      const s = this.sparks[i];
+      if (s.alpha <= 0) continue;
+
+      ctx.globalAlpha = Math.max(0, s.alpha);
+      ctx.strokeStyle = s.color;
+      ctx.fillStyle = s.color;
+      ctx.lineWidth = s.size;
+
+      // 沿运动方向拉伸的飞溅火花细线 (逼真电焊飞星)
+      const angle = Math.atan2(s.vy, s.vx);
+      const tailX = s.x - Math.cos(angle) * (s.length * s.alpha);
+      const tailY = s.y - Math.sin(angle) * (s.length * s.alpha);
+
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(s.x, s.y);
+      ctx.stroke();
+
+      // 火花头部耀眼亮点
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.size * 0.8, 0, TWO_PI);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
 class SpriteDustPuff {
   constructor(x, y, scale) {
     this.x = x;
@@ -1541,11 +1749,16 @@ class TowerBloxxGame {
       }
     }
 
+    // 触发方案 1 建筑撞击特效：接缝瞬间高光 + 电焊飞溅火花 + 横向扁平冲击波光环 (彻底替代旧版灰色爆炸烟雾)
+    const isRetro = this.theme === 'retro';
+    this.spriteEffects.push(new ContactSeamFlash(landing.x, landingScreenY, landing.w, isPerfect, isRetro));
+    this.spriteEffects.push(new ImpactShockwave(landing.x, landingScreenY, landing.w, isPerfect, isRetro));
+    this.spriteEffects.push(new WeldingSparkEmitter(landing.x, landingScreenY, landing.w, isPerfect, isRetro));
+
     if (isPerfect || this.combo > 0) {
       this.spriteEffects.push(new SparkleStar(landing.x, landingScreenY - landing.h/2, 2.5));
       this.spriteEffects.push(new GoldReinforceEffect(landing.x, landingScreenY, landing.w, landing.h));
     }
-    this.spriteEffects.push(new SpriteDustPuff(landing.x, landingScreenY, 2.5));
 
     // 触发居民降落伞入住动画 (3 ~ 5 名小居民随机自然分布在屋顶范畴内，绝不出界，呈现热气腾腾的生活气息!)
     const targetBlockIndex = this.tower.length;
@@ -1562,11 +1775,7 @@ class TowerBloxxGame {
     // E4: 居民增加
     const popAdd = (isPerfect ? 80 : 40) + Math.floor(Math.random() * 20);
     this.population += popAdd;
-    this.triggerShake(5, 10); // 落地打压震屏
-    
-    // 触发烟尘效果
-    const dustColor = this.theme === 'retro' ? '#0f380f' : '#cbd5e1';
-    this.particles.emitDust(landing.x, landingScreenY, dustColor, this.theme === 'retro');
+    this.triggerShake(isPerfect ? 6 : 4, 10); // 落地打压震屏
 
     // 压入已固定的楼层列表
     this.tower.push({
