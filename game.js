@@ -2773,38 +2773,8 @@ class TowerBloxxGame {
       this.drawScandinavianBlock(drawX, drawY, block.w, block.h, isRetro, idx, blockAngle);
     }
 
-    // 🌟 【高能连击金光护罩 (Golden Energy Field)】连击 >= 3 时，全塔两侧环绕流金脉冲柱！
-    if (this.combo >= 3 && this.tower.length > 0 && !isRetro) {
-      this.ctx.save();
-      const topIdx = this.tower.length - 1;
-      const topBlock = this.tower[topIdx];
-      const topY = groundY - (topIdx + 1) * topBlock.h + this.camera.y;
-      const towerH = this.tower.length * this.blockHeight;
-
-      const auraGrad = this.ctx.createLinearGradient(0, topY, 0, topY + towerH);
-      auraGrad.addColorStop(0, 'rgba(255, 209, 102, 0.7)');
-      auraGrad.addColorStop(0.5, 'rgba(245, 158, 11, 0.35)');
-      auraGrad.addColorStop(1, 'rgba(255, 209, 102, 0)');
-
-      this.ctx.strokeStyle = auraGrad;
-      this.ctx.lineWidth = 3.5;
-      this.ctx.shadowBlur = 12;
-      this.ctx.shadowColor = '#ffd166';
-
-      // 左侧发光能量柱
-      this.ctx.beginPath();
-      this.ctx.moveTo(topBlock.x - topBlock.w / 2 - 6, topY - 10);
-      this.ctx.lineTo(topBlock.x - topBlock.w / 2 - 6, topY + towerH);
-      this.ctx.stroke();
-
-      // 右侧发光能量柱
-      this.ctx.beginPath();
-      this.ctx.moveTo(topBlock.x + topBlock.w / 2 + 6, topY - 10);
-      this.ctx.lineTo(topBlock.x + topBlock.w / 2 + 6, topY + towerH);
-      this.ctx.stroke();
-
-      this.ctx.restore();
-    }
+    // 🌟 【高能连击金光状态】：连击 >= 3 时，顶楼与连击楼层自带紧贴楼体的流金微光光晕 (绝不再悬空脱离楼体)
+    // 移除原先僵硬的悬空直线，保证 100% 紧密贴合每层楼的外轮廓
 
     // E1: 仅在游戏结束 (GAMEOVER) 楼房封顶时，给最高层画封顶屋顶盖 (Roof Cap)
     if (this.state === 'GAMEOVER' && this.tower.length > 0) {
@@ -2923,6 +2893,55 @@ class TowerBloxxGame {
     }
   }
 
+  // 5 套协调优雅的北欧地标建筑调色盘 (提升楼体丰富度与色彩美感)
+  getBlockPalette(idx) {
+    const palettes = [
+      {
+        // 0. 经典北欧湖青 (Classic Nordic Teal)
+        frontBase: '#00a896', frontTop: '#028090', frontDeep: '#05668d',
+        topLight: '#90e0ef', topDark: '#48cae4',
+        sideLight: '#014f86', sideDark: '#012a4a',
+        accentGold: '#ffd166', windowTrim: '#ffffff',
+        seamLine: 'rgba(3, 4, 94, 0.2)'
+      },
+      {
+        // 1. 温暖斯堪的纳维亚陶土红 (Warm Terracotta Brick)
+        frontBase: '#e76f51', frontTop: '#f4a261', frontDeep: '#b83a22',
+        topLight: '#ffedd5', topDark: '#f4a261',
+        sideLight: '#c2410c', sideDark: '#7c2d12',
+        accentGold: '#fef08a', windowTrim: '#ffffff',
+        seamLine: 'rgba(124, 45, 18, 0.22)'
+      },
+      {
+        // 2. 哥本哈根明黄太阳色 (Sunflower Amber)
+        frontBase: '#e9c46a', frontTop: '#f4d35e', frontDeep: '#c69214',
+        topLight: '#fef9c3', topDark: '#fde047',
+        sideLight: '#ca8a04', sideDark: '#713f12',
+        accentGold: '#ffffff', windowTrim: '#ffffff',
+        seamLine: 'rgba(113, 63, 18, 0.2)'
+      },
+      {
+        // 3. 峡湾森林鼠尾草绿 (Fjord Forest Sage)
+        frontBase: '#2a9d8f', frontTop: '#52b788', frontDeep: '#1b4332',
+        topLight: '#d8f3dc', topDark: '#74c69d',
+        sideLight: '#2d6a4f', sideDark: '#081c15',
+        accentGold: '#ffd166', windowTrim: '#ffffff',
+        seamLine: 'rgba(8, 28, 21, 0.22)'
+      },
+      {
+        // 4. 都会摩登深海靛蓝 (Modern Metropolis Indigo)
+        frontBase: '#3a506b', frontTop: '#5bc0be', frontDeep: '#1c2541',
+        topLight: '#e0f2fe', topDark: '#7dd3fc',
+        sideLight: '#1c2541', sideDark: '#0b132b',
+        accentGold: '#38bdf8', windowTrim: '#ffffff',
+        seamLine: 'rgba(11, 19, 43, 0.25)'
+      }
+    ];
+
+    let pIdx = (idx === 999) ? (this.tower.length % palettes.length) : (idx % palettes.length);
+    return palettes[pIdx];
+  }
+
   // 绘制诺基亚原版 2.5D 伪立体建筑单元 (走心与精致渲染)
   // viewAngle: 当前视角偏转角 (负 = 看到左侧面, 正 = 看到右侧面)
   drawScandinavianBlock(x, y, w, h, isRetro, idx, viewAngle) {
@@ -2982,10 +3001,8 @@ class TowerBloxxGame {
       return;
     }
 
-    // ======= 走心高质感诺基亚 2.5D 配色 =======
-    const frontBase = '#00a896';    // 主墙体靓丽湖青
-    const topColor = '#48cae4';     // 顶面受光高亮
-    const sideColor = '#014f86';    // 侧面深邃蓝色
+    // ======= 走心高质感北欧多彩 2.5D 配色 =======
+    const pal = this.getBlockPalette(idx);
     const outlineColor = '#03045e'; // 经典深蓝包边
 
     this.ctx.strokeStyle = outlineColor;
@@ -2993,20 +3010,23 @@ class TowerBloxxGame {
     this.ctx.lineJoin = 'round';
     this.ctx.lineCap = 'round';
 
-    // 下落发光
+    // 下落发光 / 高 Combo 黄金微光 (紧密依附于楼体自身)
     if (idx === 999) {
       this.ctx.shadowBlur = 14;
       this.ctx.shadowColor = '#00f0ff';
+    } else if (this.combo >= 3 && !isRetro) {
+      this.ctx.shadowBlur = 8;
+      this.ctx.shadowColor = '#ffd166';
     }
 
-    // ======= 1. 侧面 (背光深蓝) =======
+    // ======= 1. 侧面 (背光深色) =======
     if (sideW > 0.5) {
       const gradSide = this.ctx.createLinearGradient(
         depthDir > 0 ? rx : lx - sideW, y,
         depthDir > 0 ? rx + sideW : lx, y + h
       );
-      gradSide.addColorStop(0, '#014f86');
-      gradSide.addColorStop(1, '#012a4a');
+      gradSide.addColorStop(0, pal.sideLight);
+      gradSide.addColorStop(1, pal.sideDark);
       this.ctx.fillStyle = gradSide;
 
       this.ctx.beginPath();
@@ -3024,12 +3044,23 @@ class TowerBloxxGame {
       this.ctx.closePath();
       this.ctx.fill();
       this.ctx.stroke();
+
+      // 3D 转角受光高亮棱线 (Corner Specular Edge)
+      this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.42)';
+      this.ctx.lineWidth = 1.0;
+      this.ctx.beginPath();
+      const cornerX = depthDir > 0 ? rx : lx;
+      this.ctx.moveTo(cornerX, y);
+      this.ctx.lineTo(cornerX, y + h);
+      this.ctx.stroke();
+      this.ctx.strokeStyle = outlineColor;
+      this.ctx.lineWidth = 2;
     }
 
     // ======= 2. 顶面 (受光亮面) =======
     const gradTop = this.ctx.createLinearGradient(lx, y - depthY, rx, y);
-    gradTop.addColorStop(0, '#90e0ef');
-    gradTop.addColorStop(1, topColor);
+    gradTop.addColorStop(0, pal.topLight);
+    gradTop.addColorStop(1, pal.topDark);
     this.ctx.fillStyle = gradTop;
 
     this.ctx.beginPath();
@@ -3042,7 +3073,7 @@ class TowerBloxxGame {
     this.ctx.stroke();
 
     // 顶面精致细香槟金边 (合并为单次 beginPath + stroke)
-    this.ctx.strokeStyle = '#ffd166';
+    this.ctx.strokeStyle = pal.accentGold;
     this.ctx.lineWidth = 1.2;
     this.ctx.beginPath();
     this.ctx.moveTo(lx, y);
@@ -3053,18 +3084,25 @@ class TowerBloxxGame {
     this.ctx.lineTo(rx + depthX, y - depthY);
     this.ctx.stroke();
 
-    // ======= 3. 正面墙体 (带渐变 + 建筑线纹 + 金属铆钉) =======
+    // ======= 3. 正面墙体 (带主题渐变 + 建筑线纹 + 金属铆钉 + 底部遮挡阴影) =======
     this.ctx.shadowBlur = 0;
     const gradFront = this.ctx.createLinearGradient(lx, y, lx, y + h);
-    gradFront.addColorStop(0, '#028090');
-    gradFront.addColorStop(0.4, frontBase);
-    gradFront.addColorStop(1, '#05668d');
+    gradFront.addColorStop(0, pal.frontTop);
+    gradFront.addColorStop(0.4, pal.frontBase);
+    gradFront.addColorStop(1, pal.frontDeep);
     this.ctx.fillStyle = gradFront;
     this.ctx.fillRect(lx, y, w, h);
     this.ctx.strokeRect(lx, y, w, h);
 
+    // 底部环境遮挡阴影 (Ambient Occlusion Shadow)
+    const aoGrad = this.ctx.createLinearGradient(lx, y + h - 6, lx, y + h);
+    aoGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    aoGrad.addColorStop(1, 'rgba(0, 0, 0, 0.22)');
+    this.ctx.fillStyle = aoGrad;
+    this.ctx.fillRect(lx, y + h - 6, w, 6);
+
     // 外墙水平建材缝隙分割线 (精细纹理)
-    this.ctx.strokeStyle = 'rgba(3, 4, 94, 0.15)';
+    this.ctx.strokeStyle = pal.seamLine;
     this.ctx.lineWidth = 1;
     this.ctx.beginPath();
     this.ctx.moveTo(lx + 2, y + h * 0.33);
@@ -3076,7 +3114,7 @@ class TowerBloxxGame {
     // 正面顶精细香槟金护栏饰条 (纤细 3.5px)
     const gradRoof = this.ctx.createLinearGradient(lx, y, rx, y);
     gradRoof.addColorStop(0, '#fff3b0');
-    gradRoof.addColorStop(0.3, '#ffd166');
+    gradRoof.addColorStop(0.3, pal.accentGold);
     gradRoof.addColorStop(0.7, '#e2b050');
     gradRoof.addColorStop(1, '#ddb892');
     this.ctx.fillStyle = gradRoof;
@@ -3104,7 +3142,7 @@ class TowerBloxxGame {
     this.ctx.restore();
   }
 
-  // 辅助函数：走心窗户绘制 (白色立体框 + 窗台底座 + 玻璃高光 + 斜向光泽，性能优化：由父级统一管理 save/restore)
+  // 辅助函数：走心窗户绘制 (白色立体框 + 窗台底座 + 窗帘剪影 + 窗台花坛绿植 + 玻璃高光)
   drawSingleWindow(x, y, w, h, animationSeed) {
     // 1. 窗户下方的黑蓝色窗台 ledge
     this.ctx.fillStyle = '#012a4a';
@@ -3117,20 +3155,43 @@ class TowerBloxxGame {
     this.ctx.lineWidth = 1;
     this.ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
 
-    // 3. 玻璃颜料与灯光
-    let isLit = this.camera.y > 500 && animationSeed % 3 === 0;
+    // 3. 玻璃颜料与灯光 (高空/傍晚亮灯或温馨暖灯)
+    let isLit = (this.camera.y > 450 && animationSeed % 2 === 0) || (animationSeed % 5 === 0);
     const glassGrad = this.ctx.createLinearGradient(x, y, x, y + h);
     if (isLit) {
-      glassGrad.addColorStop(0, '#fef08a');
+      glassGrad.addColorStop(0, '#fffbeb');
+      glassGrad.addColorStop(0.4, '#fef08a');
       glassGrad.addColorStop(1, '#f59e0b');
     } else {
-      glassGrad.addColorStop(0, '#93c5fd');
-      glassGrad.addColorStop(1, '#2563eb');
+      glassGrad.addColorStop(0, '#bae6fd');
+      glassGrad.addColorStop(0.5, '#60a5fa');
+      glassGrad.addColorStop(1, '#1d4ed8');
     }
     this.ctx.fillStyle = glassGrad;
     this.ctx.fillRect(x, y, w, h);
 
-    // 4. 玻璃对角线高光 Sheen Slash (极具光泽感)
+    // 4. 温馨小窗帘 (随机出现在部分窗户)
+    if (animationSeed % 3 === 0) {
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+      // 左窗帘
+      this.ctx.beginPath();
+      this.ctx.moveTo(x, y);
+      this.ctx.lineTo(x + w * 0.28, y);
+      this.ctx.lineTo(x + w * 0.12, y + h * 0.8);
+      this.ctx.lineTo(x, y + h * 0.8);
+      this.ctx.closePath();
+      this.ctx.fill();
+      // 右窗帘
+      this.ctx.beginPath();
+      this.ctx.moveTo(x + w, y);
+      this.ctx.lineTo(x + w * 0.72, y);
+      this.ctx.lineTo(x + w * 0.88, y + h * 0.8);
+      this.ctx.lineTo(x + w, y + h * 0.8);
+      this.ctx.closePath();
+      this.ctx.fill();
+    }
+
+    // 5. 玻璃对角线高光 Sheen Slash (极具通透晶莹光泽感)
     this.ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
     this.ctx.beginPath();
     this.ctx.moveTo(x, y);
@@ -3140,15 +3201,47 @@ class TowerBloxxGame {
     this.ctx.closePath();
     this.ctx.fill();
 
-    // 5. 田字窗格框架
+    // 6. 田字窗格框架
     this.ctx.strokeStyle = '#ffffff';
-    this.ctx.lineWidth = 1.2;
+    this.ctx.lineWidth = 1.0;
     this.ctx.beginPath();
     this.ctx.moveTo(x + w / 2, y);
     this.ctx.lineTo(x + w / 2, y + h);
     this.ctx.moveTo(x, y + h / 2);
     this.ctx.lineTo(x + w, y + h / 2);
     this.ctx.stroke();
+
+    // 7. 窗台微型绿植花池与鲜花 (Mini Balcony Flower Box)
+    if (animationSeed % 2 === 1) {
+      // 花盆底座 (深铁艺)
+      this.ctx.fillStyle = '#1e293b';
+      this.ctx.fillRect(x - 1, y + h - 1, w + 2, 3.5);
+
+      // 嫩绿叶丛
+      const leafColors = ['#22c55e', '#16a34a', '#15803d'];
+      for (let li = 0; li < 3; li++) {
+        const lx = x + 2.5 + li * (w - 5) / 2;
+        this.ctx.fillStyle = leafColors[li % 3];
+        this.ctx.beginPath();
+        this.ctx.arc(lx, y + h - 2.5, 2.0, 0, TWO_PI);
+        this.ctx.fill();
+      }
+
+      // 缤纷鲜花小花朵 (粉红、明黄、纯白点缀)
+      const flowerColors = ['#f43f5e', '#fbbf24', '#ffffff', '#c084fc'];
+      const fColor1 = flowerColors[animationSeed % flowerColors.length];
+      const fColor2 = flowerColors[(animationSeed + 2) % flowerColors.length];
+
+      this.ctx.fillStyle = fColor1;
+      this.ctx.beginPath();
+      this.ctx.arc(x + w * 0.28, y + h - 4.0, 1.4, 0, TWO_PI);
+      this.ctx.fill();
+
+      this.ctx.fillStyle = fColor2;
+      this.ctx.beginPath();
+      this.ctx.arc(x + w * 0.72, y + h - 4.0, 1.4, 0, TWO_PI);
+      this.ctx.fill();
+    }
   }
 
   // 绘制吊架、主钢索、加长 4 角动态吊索与超高清重工业金属吊钩
