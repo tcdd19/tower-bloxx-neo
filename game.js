@@ -4,6 +4,9 @@
  * ==========================================================================
  */
 
+// 全局常量缓存 (避免每帧重复计算)
+const TWO_PI = Math.PI * 2;
+
 // ==========================================================================
 // 0. 资源预加载系统
 // ==========================================================================
@@ -597,9 +600,9 @@ class Particle {
     this.alpha -= this.decay;
   }
 
+  // 性能优化：不再每粒子 save/restore，由 ParticleSystem 批量管理
   draw(ctx) {
     if (this.alpha <= 0) return;
-    ctx.save();
     ctx.globalAlpha = this.alpha;
     ctx.fillStyle = this.color;
     
@@ -609,10 +612,10 @@ class Particle {
       ctx.shadowBlur = 8;
       ctx.shadowColor = this.color;
       ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.arc(this.x, this.y, this.size, 0, TWO_PI);
       ctx.fill();
+      ctx.shadowBlur = 0;
     }
-    ctx.restore();
   }
 }
 
@@ -638,19 +641,18 @@ class SmokeParticle {
     this.size += 0.25;
   }
 
+  // 性能优化：不再每粒子 save/restore
   draw(ctx) {
     if (this.alpha <= 0) return;
-    ctx.save();
     ctx.globalAlpha = this.alpha;
     ctx.fillStyle = this.color;
     if (this.themeRetro) {
       ctx.fillRect(Math.floor(this.x), Math.floor(this.y), this.size, this.size);
     } else {
       ctx.beginPath();
-      ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+      ctx.arc(this.x, this.y, this.size, 0, TWO_PI);
       ctx.fill();
     }
-    ctx.restore();
   }
 }
 
@@ -672,17 +674,26 @@ class ParticleSystem {
     }
   }
 
+  // 性能优化：O(n) 交换压缩替代 O(n²) splice 逐个删除
   update() {
-    for (let i = this.particles.length - 1; i >= 0; i--) {
+    let writeIdx = 0;
+    for (let i = 0; i < this.particles.length; i++) {
       this.particles[i].update();
-      if (this.particles[i].alpha <= 0) {
-        this.particles.splice(i, 1);
+      if (this.particles[i].alpha > 0) {
+        this.particles[writeIdx++] = this.particles[i];
       }
     }
+    this.particles.length = writeIdx;
   }
 
+  // 性能优化：单次 save/restore 批量绘制所有粒子
   draw(ctx) {
-    this.particles.forEach(p => p.draw(ctx));
+    if (this.particles.length === 0) return;
+    ctx.save();
+    for (let i = 0; i < this.particles.length; i++) {
+      this.particles[i].draw(ctx);
+    }
+    ctx.restore();
   }
 
   clear() {
@@ -776,6 +787,9 @@ class TowerBloxxGame {
 
     // E3: 屏幕震动
     this.screenShake = { intensity: 0, duration: 0 };
+
+    // 性能优化：渐变/颜色缓存
+    this._gradientCache = {};
 
     // 屏幕自适应
     this.dpr = window.devicePixelRatio || 1;
@@ -1235,9 +1249,9 @@ class TowerBloxxGame {
 
     // 悬浮醒目金光里程碑通知
     this.floatingTexts.push(new FloatingText(
-      `✨ ${floorCount}F 摩天里程碑达成! (+500居民) ✨`,
       this.baseWidth / 2,
       topY - 60,
+      `✨ ${floorCount}F 摩天里程碑达成! (+500居民) ✨`,
       '#ffd166'
     ));
 
@@ -1317,20 +1331,24 @@ class TowerBloxxGame {
       }
     }
 
-    // 3. 星星云朵视差流动
-    this.stars.forEach(star => {
+    // 3. 星星云朵视差流动 (性能优化：for 循环替代 forEach)
+    const starLen = this.stars.length;
+    for (let i = 0; i < starLen; i++) {
+      const star = this.stars[i];
       star.alpha += star.twinkleSpeed * dtFactor;
       if (star.alpha > 1 || star.alpha < 0) {
         star.twinkleSpeed = -star.twinkleSpeed;
       }
-    });
+    }
 
-    this.clouds.forEach(cloud => {
+    const cloudLen = this.clouds.length;
+    for (let i = 0; i < cloudLen; i++) {
+      const cloud = this.clouds[i];
       cloud.x += cloud.speed * dtFactor;
       if (cloud.x > this.baseWidth + 100) {
         cloud.x = -150;
       }
-    });
+    }
 
     if (this.state !== 'PLAYING') return;
 
@@ -1634,11 +1652,15 @@ class TowerBloxxGame {
     // 7. 绘制粒子
     this.particles.draw(this.ctx);
 
-    // 绘制基于 Sprite 的特效
-    this.spriteEffects.forEach(effect => effect.draw(this.ctx, this.loader));
+    // 绘制基于 Sprite 的特效 (性能优化：for 循环)
+    for (let i = 0; i < this.spriteEffects.length; i++) {
+      this.spriteEffects[i].draw(this.ctx, this.loader);
+    }
 
-    // 8. 绘制 Combo 漂浮文字
-    this.floatingTexts.forEach(txt => txt.draw(this.ctx, 'Share Tech Mono', 'Outfit'));
+    // 8. 绘制 Combo 漂浮文字 (性能优化：for 循环)
+    for (let i = 0; i < this.floatingTexts.length; i++) {
+      this.floatingTexts[i].draw(this.ctx, 'Share Tech Mono', 'Outfit');
+    }
 
     // 9. 绘制左下角原版风格楼层进度与居民数仪表盘
     this.drawBottomLeftHUD();
@@ -2280,7 +2302,7 @@ class TowerBloxxGame {
       this._colorCache[hex] = [r, g, b];
     }
     return this._colorCache[hex];
-  },
+  }
 
   interpolateColor(color1, color2, factor) {
     factor = factor < 0 ? 0 : (factor > 1 ? 1 : factor);
@@ -2412,8 +2434,10 @@ class TowerBloxxGame {
     }
     this.ctx.stroke();
 
-    // 2. HD 矢量多重北欧冷空松树 (清晰精致层叠)
-    this.parkTrees.forEach(tree => {
+    // 2. HD 矢量多重北欧冷空松树 (清晰精致层叠，性能优化：for 循环)
+    const treeLen = this.parkTrees.length;
+    for (let i = 0; i < treeLen; i++) {
+      const tree = this.parkTrees[i];
       const tx = tree.x;
       const ty = drawY;
 
@@ -2435,7 +2459,7 @@ class TowerBloxxGame {
       this.ctx.moveTo(tx, ty - 75); this.ctx.lineTo(tx - 22, ty - 45); this.ctx.lineTo(tx + 22, ty - 45); this.ctx.closePath(); this.ctx.fill();
       this.ctx.beginPath();
       this.ctx.moveTo(tx, ty - 55); this.ctx.lineTo(tx - 28, ty - 25); this.ctx.lineTo(tx + 28, ty - 25); this.ctx.closePath(); this.ctx.fill();
-    });
+    }
 
     // 3. HD 暖黄街灯 (英伦风灯光晕)
     for (let lx = 60; lx < this.baseWidth; lx += 180) {
@@ -2474,16 +2498,18 @@ class TowerBloxxGame {
     if (starAlphaMultiplier > 0.05) {
       this.ctx.save();
       this.ctx.fillStyle = '#ffffff';
-      this.stars.forEach(star => {
+      const starLen = this.stars.length;
+      for (let i = 0; i < starLen; i++) {
+        const star = this.stars[i];
         // 星星产生 0.12 倍的微小纵向视差
         const startYWorld = star.y + this.camera.y * 0.12;
         let drawY = ((startYWorld % this.baseHeight) + this.baseHeight) % this.baseHeight;
         
         this.ctx.globalAlpha = star.alpha * starAlphaMultiplier;
         this.ctx.beginPath();
-        this.ctx.arc(star.x, drawY, star.size, 0, Math.PI * 2);
+        this.ctx.arc(star.x, drawY, star.size, 0, TWO_PI);
         this.ctx.fill();
-      });
+      }
       this.ctx.restore();
     }
 
@@ -2491,7 +2517,9 @@ class TowerBloxxGame {
     const cloudAlphaMultiplier = Math.max(0.0, 1.0 - (altitude - 600) / 1200);
 
     if (cloudAlphaMultiplier > 0.02) {
-      this.clouds.forEach(cloud => {
+      const cloudLen = this.clouds.length;
+      for (let i = 0; i < cloudLen; i++) {
+        const cloud = this.clouds[i];
         const cloudYWorld = cloud.y + this.camera.y * 0.4; // 视差拉伸系数 0.4
         let drawY = ((cloudYWorld % (this.baseHeight + 100)) + (this.baseHeight + 100)) % (this.baseHeight + 100) - 50;
 
@@ -2503,14 +2531,14 @@ class TowerBloxxGame {
         const cx = cloud.x;
         const cy = drawY;
         const r = 24 * cloud.scale;
-        this.ctx.arc(cx, cy, r, 0, Math.PI*2);
-        this.ctx.arc(cx + r*1.2, cy - r*0.2, r*0.8, 0, Math.PI*2);
-        this.ctx.arc(cx - r*1.0, cy + r*0.1, r*0.7, 0, Math.PI*2);
-        this.ctx.arc(cx + r*0.5, cy + r*0.2, r*0.9, 0, Math.PI*2);
+        this.ctx.arc(cx, cy, r, 0, TWO_PI);
+        this.ctx.arc(cx + r*1.2, cy - r*0.2, r*0.8, 0, TWO_PI);
+        this.ctx.arc(cx - r*1.0, cy + r*0.1, r*0.7, 0, TWO_PI);
+        this.ctx.arc(cx + r*0.5, cy + r*0.2, r*0.9, 0, TWO_PI);
         this.ctx.fill();
         
         this.ctx.restore();
-      });
+      }
     }
   }
 
@@ -2544,20 +2572,22 @@ class TowerBloxxGame {
     }
     this.ctx.restore();
 
-    // 遍历绘制每一层北欧风格楼房
-    this.tower.forEach((block, idx) => {
-      const swayFactor = Math.pow((idx + 1) / this.tower.length, 1.5);
+    // 遍历绘制每一层北欧风格楼房 (性能优化：for 循环)
+    const towerLen = this.tower.length;
+    for (let idx = 0; idx < towerLen; idx++) {
+      const block = this.tower[idx];
+      const swayFactor = Math.pow((idx + 1) / towerLen, 1.5);
       const currentBlockSway = this.towerSway.offset * swayFactor;
 
       const drawX = block.x + currentBlockSway;
       const drawY = groundY - (idx + 1) * block.h + this.camera.y;
 
       // 超出屏幕下边或上边的楼层视口裁剪，直接跳过 (极速 60FPS 性能!)
-      if (drawY > this.baseHeight + 100 || drawY < -100) return;
+      if (drawY > this.baseHeight + 100 || drawY < -100) continue;
 
       const blockAngle = block.landingAngle || (this.towerSway.offset * 0.005);
       this.drawScandinavianBlock(drawX, drawY, block.w, block.h, isRetro, idx, blockAngle);
-    });
+    }
 
     // 🌟 【高能连击金光护罩 (Golden Energy Field)】连击 >= 3 时，全塔两侧环绕流金脉冲柱！
     if (this.combo >= 3 && this.tower.length > 0 && !isRetro) {
@@ -2813,24 +2843,14 @@ class TowerBloxxGame {
     this.ctx.fill();
     this.ctx.stroke();
 
-    // 顶面精致细香槟金边 (纤细 1.2px，典雅高级不臃肿)
+    // 顶面精致细香槟金边 (合并为单次 beginPath + stroke)
     this.ctx.strokeStyle = '#ffd166';
     this.ctx.lineWidth = 1.2;
-
-    // 左斜边
     this.ctx.beginPath();
     this.ctx.moveTo(lx, y);
     this.ctx.lineTo(lx + depthX, y - depthY);
-    this.ctx.stroke();
-
-    // 右斜边
-    this.ctx.beginPath();
     this.ctx.moveTo(rx, y);
     this.ctx.lineTo(rx + depthX, y - depthY);
-    this.ctx.stroke();
-
-    // 后顶边
-    this.ctx.beginPath();
     this.ctx.moveTo(lx + depthX, y - depthY);
     this.ctx.lineTo(rx + depthX, y - depthY);
     this.ctx.stroke();
@@ -2886,10 +2906,8 @@ class TowerBloxxGame {
     this.ctx.restore();
   }
 
-  // 辅助函数：走心窗户绘制 (白色立体框 + 窗台底座 + 玻璃高光 + 斜向光泽)
+  // 辅助函数：走心窗户绘制 (白色立体框 + 窗台底座 + 玻璃高光 + 斜向光泽，性能优化：由父级统一管理 save/restore)
   drawSingleWindow(x, y, w, h, animationSeed) {
-    this.ctx.save();
-
     // 1. 窗户下方的黑蓝色窗台 ledge
     this.ctx.fillStyle = '#012a4a';
     this.ctx.fillRect(x - 2, y + h + 1, w + 4, 3);
@@ -2933,8 +2951,6 @@ class TowerBloxxGame {
     this.ctx.moveTo(x, y + h / 2);
     this.ctx.lineTo(x + w, y + h / 2);
     this.ctx.stroke();
-
-    this.ctx.restore();
   }
 
   // 绘制吊架、主钢索、加长 4 角动态吊索与超高清重工业金属吊钩
