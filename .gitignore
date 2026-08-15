@@ -1,0 +1,13 @@
+# Extracted JARs & Java decompiled files
+extracted_jar/
+extracted_deluxe/
+extracted_assets/
+extracted_deluxe_assets/
+*.class
+*.jar
+*.mid
+patch.js
+patch.py
+*.log
+.DS_Store
+Thumbs.db
