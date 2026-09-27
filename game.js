@@ -395,6 +395,151 @@ class GoldReinforceEffect {
   }
 }
 
+// ==========================================================================
+// 全屏高连击彩带纸屑加农炮特效 (Dual Confetti Cannon & Fluttering Ribbons)
+// ==========================================================================
+class ConfettiCannonEffect {
+  constructor(canvasWidth, canvasHeight) {
+    this.w = canvasWidth;
+    this.h = canvasHeight;
+    this.timer = 0;
+    this.duration = 240; // 约 3.5-4 秒
+    this.active = true;
+    this.pieces = [];
+
+    // 庆祝节日马卡龙北欧缤纷调色盘
+    const colors = [
+      '#ff4757', '#2ed573', '#1e90ff', '#ffa502', 
+      '#ff6b81', '#eccc68', '#a55eea', '#ffd166', 
+      '#00f0ff', '#ff9ff3', '#54a0ff', '#5f27cd'
+    ];
+
+    const totalCount = 90;
+    for (let i = 0; i < totalCount; i++) {
+      // 左右双侧对角高压喷射加农炮
+      const fromLeft = i % 2 === 0;
+      const startX = fromLeft ? -10 + Math.random() * 20 : canvasWidth + 10 - Math.random() * 20;
+      const startY = canvasHeight - 30 - Math.random() * 120;
+
+      // 初速度向上大角度喷射
+      const speed = 10 + Math.random() * 11;
+      const baseAngle = fromLeft ? (-Math.PI / 4) : (-3 * Math.PI / 4);
+      const angle = baseAngle + (Math.random() - 0.5) * 0.65;
+
+      const isRibbon = Math.random() < 0.28; // 28% 为优美飘落长彩带，其余为方块翻滚彩纸
+
+      this.pieces.push({
+        x: startX,
+        y: startY,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        isRibbon: isRibbon,
+        // 纸片三维翻滚姿态与角度
+        rx: Math.random() * Math.PI * 2,
+        ry: Math.random() * Math.PI * 2,
+        rz: Math.random() * Math.PI * 2,
+        vrx: (Math.random() - 0.5) * 0.18,
+        vry: (Math.random() - 0.5) * 0.22,
+        vrz: (Math.random() - 0.5) * 0.08,
+        // 尺寸
+        pw: isRibbon ? (3 + Math.random() * 2) : (6 + Math.random() * 5),
+        ph: isRibbon ? (22 + Math.random() * 16) : (8 + Math.random() * 7),
+        wobble: Math.random() * Math.PI * 2,
+        wobbleSpeed: 0.06 + Math.random() * 0.08,
+        airFriction: 0.965 + Math.random() * 0.015,
+        alpha: 1.0
+      });
+    }
+  }
+
+  update(dt) {
+    this.timer += dt;
+    const dtFactor = Math.min(dt / 16.666, 3.0);
+    const progress = this.timer / this.duration;
+
+    if (progress >= 1.0) {
+      this.active = false;
+      return;
+    }
+
+    const fadeAlpha = progress > 0.75 ? Math.max(0, (1.0 - progress) / 0.25) : 1.0;
+
+    for (let i = 0; i < this.pieces.length; i++) {
+      const p = this.pieces[i];
+      p.x += p.vx * dtFactor;
+      p.y += p.vy * dtFactor;
+
+      // 空气阻力
+      p.vx *= Math.pow(p.airFriction, dtFactor);
+      p.vy *= Math.pow(p.airFriction, dtFactor);
+      // 真实轻质重力加速度 + 终端飘落限速
+      p.vy += 0.20 * dtFactor;
+      if (p.vy > 3.8) p.vy = 3.8;
+
+      // 飘动正弦风阻侧滑 (Wobble)
+      p.wobble += p.wobbleSpeed * dtFactor;
+      p.x += Math.sin(p.wobble) * 1.2 * dtFactor;
+
+      // 3D 旋转翻滚
+      p.rx += p.vrx * dtFactor;
+      p.ry += p.vry * dtFactor;
+      p.rz += p.vrz * dtFactor;
+
+      p.alpha = fadeAlpha;
+    }
+  }
+
+  draw(ctx) {
+    if (!this.active || this.pieces.length === 0) return;
+    ctx.save();
+
+    for (let i = 0; i < this.pieces.length; i++) {
+      const p = this.pieces[i];
+      if (p.alpha <= 0.01) continue;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rz);
+      ctx.globalAlpha = p.alpha;
+      ctx.fillStyle = p.color;
+
+      if (p.isRibbon) {
+        // 优雅飘扬波浪形长彩带
+        ctx.beginPath();
+        const segments = 4;
+        const segH = p.ph / segments;
+        ctx.moveTo(0, -p.ph / 2);
+        for (let s = 1; s <= segments; s++) {
+          const sy = -p.ph / 2 + s * segH;
+          const sx = Math.sin(p.wobble + s * 0.8) * 6;
+          ctx.lineTo(sx, sy);
+        }
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.pw;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      } else {
+        // 模拟 3D 翻滚正方形/长方形彩纸片 (根据 rx / ry 余弦值动态投影缩放)
+        const scaleX = Math.cos(p.rx);
+        const scaleY = Math.sin(p.ry);
+        ctx.scale(scaleX, scaleY);
+
+        ctx.fillRect(-p.pw / 2, -p.ph / 2, p.pw, p.ph);
+        // 背面暗色光影对比
+        if (scaleX * scaleY < 0) {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+          ctx.fillRect(-p.pw / 2, -p.ph / 2, p.pw, p.ph);
+        }
+      }
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+}
+
 // 居民降落伞入住特效类 (从空中飘落降落至新建造楼层窗户)
 class ResidentParachute {
   constructor(startX, startY, targetBlockIndex, offsetX = 0) {
@@ -899,6 +1044,79 @@ class SoundSynth {
       osc.stop(now + idx * 0.15 + 0.65);
     });
   }
+
+  // 5/10/15+ 连击水晶竖琴琶音 (Crystalline Pentatonic Harp Arpeggio)
+  playHarpArpeggio(combo = 5) {
+    if (!this.enabled || !this.ctx) return;
+    try {
+      this.init();
+      if (!this.ctx) return;
+      if (this.ctx.state === 'suspended') this.ctx.resume();
+
+      const now = this.ctx.currentTime;
+      // 五声音阶明朗庆典琶音音符列表 (C5, D5, E5, G5, A5, C6, D6, E6, G6)
+      const pentatonic = [523.25, 587.33, 659.25, 783.99, 880.00, 1046.50, 1174.66, 1318.51, 1567.98];
+      
+      // 连击越高，琶音音符越丰富
+      let noteCount = 5;
+      let startIdx = 0;
+      if (combo >= 15) {
+        noteCount = 8;
+        startIdx = 1;
+      } else if (combo >= 10) {
+        noteCount = 7;
+        startIdx = 0;
+      } else {
+        noteCount = 5;
+        startIdx = 0;
+      }
+
+      const activeNotes = pentatonic.slice(startIdx, startIdx + noteCount);
+      const noteGap = 0.042; // 每音间隔 42ms 极速清脆扫弦
+
+      activeNotes.forEach((freq, idx) => {
+        const noteTime = now + idx * noteGap;
+
+        // 主音：柔美纯净正弦波
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+
+        // 泛音：微弱高次泛音，塑造如同真实竖琴/八音盒般的水晶清脆感
+        const oscHarmonic = this.ctx.createOscillator();
+        const gainHarmonic = this.ctx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, noteTime);
+
+        oscHarmonic.type = 'triangle';
+        oscHarmonic.frequency.setValueAtTime(freq * 2, noteTime);
+
+        // 主音包络：极速起音 (5ms) + 铃音回荡长衰减 (480ms)
+        gain.gain.setValueAtTime(0, noteTime);
+        gain.gain.linearRampToValueAtTime(0.16, noteTime + 0.006);
+        gain.gain.exponentialRampToValueAtTime(0.001, noteTime + 0.48);
+
+        // 泛音包络：极快消散
+        gainHarmonic.gain.setValueAtTime(0, noteTime);
+        gainHarmonic.gain.linearRampToValueAtTime(0.06, noteTime + 0.004);
+        gainHarmonic.gain.exponentialRampToValueAtTime(0.001, noteTime + 0.22);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        oscHarmonic.connect(gainHarmonic);
+        gainHarmonic.connect(this.ctx.destination);
+
+        osc.start(noteTime);
+        osc.stop(noteTime + 0.5);
+
+        oscHarmonic.start(noteTime);
+        oscHarmonic.stop(noteTime + 0.25);
+      });
+    } catch (e) {
+      console.warn("竖琴琶音播放跳过:", e);
+    }
+  }
 }
 
 // ==========================================================================
@@ -924,6 +1142,10 @@ class HapticsController {
 
   vibratePerfect() {
     this.vibrate([35, 30, 45]);
+  }
+
+  vibrateCelebration() {
+    this.vibrate([40, 50, 60, 50, 100]);
   }
 
   vibrateFail() {
@@ -1946,6 +2168,24 @@ class TowerBloxxGame {
 
       const particleColor = this.theme === 'retro' ? '#0f380f' : '#ffd166';
       this.particles.emit(landing.x, landingScreenY, particleColor, 25, this.theme === 'retro');
+
+      // 4. 高连击全屏彩带加农炮与清脆竖琴琶音 (5/10/15+ 连击庆典)
+      if (this.combo >= 5 && (this.combo % 5 === 0 || this.combo === 5)) {
+        this.spriteEffects.push(new ConfettiCannonEffect(this.baseWidth, this.baseHeight));
+        this.synth.playHarpArpeggio(this.combo);
+        this.haptics.vibrateCelebration();
+
+        let cheerText = `MEGA COMBO! 🎊`;
+        let cheerColor = '#ffd166';
+        if (this.combo >= 15) {
+          cheerText = `LEGENDARY COMBO! 🏆`;
+          cheerColor = '#ff6b81';
+        } else if (this.combo >= 10) {
+          cheerText = `EPIC COMBO! 🌟`;
+          cheerColor = '#00f0ff';
+        }
+        this.floatingTexts.push(new FloatingText(textX, textY - 24, cheerText, cheerColor, true));
+      }
     } else {
       this.combo = 0;
       this.score += scoreAdd;
@@ -2787,94 +3027,134 @@ class TowerBloxxGame {
     return `rgb(${r},${g},${b})`;
   }
 
-  // 绘制左下角原版风格楼层目标进度与居民数仪表盘
+  // 极简纤巧爬升光标仪表盘 (仅占用 26px 极窄左边缘，彻底消除任何大楼重叠与遮挡)
   drawBottomLeftHUD() {
     if (this.state !== 'PLAYING') return;
 
     this.ctx.save();
+    const isRetro = this.theme === 'retro';
     
-    const panelX = 14;
-    const panelY = this.baseHeight - 210;
-    const panelW = 90;
-    const panelH = 185;
-
-    // 1. 半透明毛玻璃暗色容器底座
-    this.ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
-    this.ctx.strokeStyle = '#38bdf8';
-    this.ctx.lineWidth = 1.5;
-    this.drawRoundedRect(panelX, panelY, panelW, panelH, 10);
-    this.ctx.fill();
-    this.ctx.stroke();
+    const gaugeX = 12;
+    const gaugeY = this.baseHeight - 165;
+    const gaugeW = 26;
+    const gaugeH = 135;
 
     let targetFloors = 50;
     if (this.tower.length >= 50) targetFloors = Math.ceil((this.tower.length + 1) / 50) * 50;
 
-    // 2. 顶端“楼层”标识
-    this.ctx.fillStyle = '#94a3b8';
-    this.ctx.font = 'bold 10px monospace';
-    this.ctx.textAlign = 'center';
-    this.ctx.fillText(`TARGET ${targetFloors}F`, panelX + panelW / 2, panelY + 16);
+    if (isRetro) {
+      // 复古像素极窄刻度槽
+      this.ctx.fillStyle = '#0f380f';
+      this.ctx.fillRect(gaugeX, gaugeY, gaugeW, gaugeH);
+      this.ctx.strokeStyle = '#306230';
+      this.ctx.strokeRect(gaugeX, gaugeY, gaugeW, gaugeH);
 
-    // 3. 立体高度进度条槽
-    const meterX = panelX + 16;
-    const meterY = panelY + 26;
-    const meterW = 12;
-    const meterH = 110;
+      // 顶部楼层
+      this.ctx.fillStyle = '#8bac0f';
+      this.ctx.font = 'bold 9px monospace';
+      this.ctx.textAlign = 'center';
+      this.ctx.fillText(`${this.tower.length}F`, gaugeX + gaugeW / 2, gaugeY + 14);
 
-    this.ctx.fillStyle = '#0f172a';
-    this.ctx.strokeStyle = '#334155';
+      // 刻度槽
+      const trackX = gaugeX + 11;
+      const trackY = gaugeY + 22;
+      const trackH = 80;
+      this.ctx.fillStyle = '#306230';
+      this.ctx.fillRect(trackX, trackY, 4, trackH);
+
+      const progress = Math.min(1.0, (this.tower.length % targetFloors) / targetFloors || (this.tower.length > 0 ? 1.0 : 0));
+      const fillH = Math.round(trackH * progress);
+      if (fillH > 0) {
+        this.ctx.fillStyle = '#8bac0f';
+        this.ctx.fillRect(trackX, trackY + trackH - fillH, 4, fillH);
+      }
+
+      // 底部人数
+      this.ctx.fillStyle = '#8bac0f';
+      this.ctx.font = '8px monospace';
+      this.ctx.fillText(`${this.population}`, gaugeX + gaugeW / 2, gaugeY + 124);
+      this.ctx.restore();
+      return;
+    }
+
+    // 1. 半透明暗色纤巧胶囊底座
+    this.ctx.fillStyle = 'rgba(15, 23, 42, 0.76)';
+    this.ctx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
     this.ctx.lineWidth = 1;
-    this.drawRoundedRect(meterX, meterY, meterW, meterH, 6);
+    this.drawRoundedRect(gaugeX, gaugeY, gaugeW, gaugeH, 13);
     this.ctx.fill();
     this.ctx.stroke();
 
-    // 充能发光刻度条
-    const progress = Math.min(1.0, (this.tower.length % 50) / 50 || (this.tower.length > 0 ? 1.0 : 0));
-    const fillH = meterH * progress;
-    if (fillH > 0) {
-      const fillGrad = this.ctx.createLinearGradient(0, meterY + meterH, 0, meterY);
-      fillGrad.addColorStop(0, '#38bdf8');
-      fillGrad.addColorStop(0.7, '#ffd166');
-      fillGrad.addColorStop(1, '#ef4444');
+    // 2. 顶端极光楼层微标 (Floor Badge)
+    this.ctx.fillStyle = '#38bdf8';
+    this.ctx.font = 'bold 10px monospace';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText(`${this.tower.length}F`, gaugeX + gaugeW / 2, gaugeY + 16);
 
-      this.ctx.fillStyle = fillGrad;
-      this.drawRoundedRect(meterX + 1.5, meterY + meterH - fillH + 1.5, meterW - 3, Math.max(3, fillH - 3), 4);
-      this.ctx.fill();
-    }
+    // 3. 极细居中氖光刻度导轨
+    const trackX = gaugeX + 11;
+    const trackY = gaugeY + 24;
+    const trackW = 4;
+    const trackH = 75;
 
-    // 右侧数值标签
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.font = 'bold 16px sans-serif';
-    this.ctx.textAlign = 'left';
-    this.ctx.fillText(`${this.tower.length}`, panelX + 36, panelY + 50);
+    // 导轨暗槽
+    this.ctx.fillStyle = '#1e293b';
+    this.drawRoundedRect(trackX, trackY, trackW, trackH, 2);
+    this.ctx.fill();
 
-    this.ctx.fillStyle = '#cbd5e1';
-    this.ctx.font = '10px sans-serif';
-    this.ctx.fillText(`/${targetFloors} 层`, panelX + 36, panelY + 66);
-
-    // 4. 底部居民人数小图标 + 人数数值
-    this.ctx.strokeStyle = '#334155';
+    // 导轨背景刻度细线 (25%, 50%, 75%)
+    this.ctx.strokeStyle = 'rgba(148, 163, 184, 0.3)';
     this.ctx.lineWidth = 1;
-    this.ctx.beginPath();
-    this.ctx.moveTo(panelX + 8, panelY + 145);
-    this.ctx.lineTo(panelX + panelW - 8, panelY + 145);
-    this.ctx.stroke();
-
-    // 人员图标 (使用解压出的 ui_population_icon 或矢量小人)
-    const popImg = this.loader.assets['ui_population_icon'];
-    if (popImg && popImg.complete) {
-      this.ctx.drawImage(popImg, panelX + 12, panelY + 152, 10, 24);
-    } else {
-      this.ctx.fillStyle = '#fbbf24';
+    for (let f = 1; f <= 3; f++) {
+      const tickY = trackY + trackH * (1 - f * 0.25);
       this.ctx.beginPath();
-      this.ctx.arc(panelX + 16, panelY + 158, 4, 0, Math.PI * 2);
+      this.ctx.moveTo(gaugeX + 4, tickY);
+      this.ctx.lineTo(gaugeX + 8, tickY);
+      this.ctx.moveTo(gaugeX + gaugeW - 8, tickY);
+      this.ctx.lineTo(gaugeX + gaugeW - 4, tickY);
+      this.ctx.stroke();
+    }
+
+    // 爬升氖光液柱
+    const progress = Math.min(1.0, (this.tower.length % targetFloors) / targetFloors || (this.tower.length > 0 ? 1.0 : 0));
+    const fillH = Math.max(0, trackH * progress);
+    const beadY = trackY + trackH - fillH;
+
+    if (fillH > 0) {
+      const neonGrad = this.ctx.createLinearGradient(0, trackY + trackH, 0, trackY);
+      neonGrad.addColorStop(0, '#00f0ff');
+      neonGrad.addColorStop(0.65, '#ffd166');
+      neonGrad.addColorStop(1, '#ef4444');
+
+      this.ctx.fillStyle = neonGrad;
+      this.drawRoundedRect(trackX, beadY, trackW, fillH, 2);
       this.ctx.fill();
     }
 
+    // 氖光爬升光标珠 (Luminescent Cursor Bead)
+    this.ctx.shadowBlur = 8;
+    this.ctx.shadowColor = '#00f0ff';
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.beginPath();
+    this.ctx.arc(trackX + trackW / 2, Math.max(trackY + 3, beadY), 3.2, 0, TWO_PI);
+    this.ctx.fill();
+    this.ctx.shadowBlur = 0;
+
+    // 4. 底部微缩居民数
+    this.ctx.fillStyle = '#fbbf24';
+    this.ctx.font = '8px sans-serif';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText('👥', gaugeX + gaugeW / 2, gaugeY + 114);
+
+    let popDisplay = `${this.population}`;
+    if (this.population >= 10000) {
+      popDisplay = `${(this.population / 1000).toFixed(1)}w`;
+    } else if (this.population >= 1000) {
+      popDisplay = `${(this.population / 1000).toFixed(1)}k`;
+    }
     this.ctx.fillStyle = '#ffd166';
-    this.ctx.font = 'bold 12px monospace';
-    this.ctx.textAlign = 'left';
-    this.ctx.fillText(`${this.population}`, panelX + 28, panelY + 168);
+    this.ctx.font = 'bold 8px monospace';
+    this.ctx.fillText(popDisplay, gaugeX + gaugeW / 2, gaugeY + 126);
 
     this.ctx.restore();
   }
@@ -3013,25 +3293,212 @@ class TowerBloxxGame {
         this.ctx.restore();
       }
     }
+
+    // 3. 高空微风流光与卷云雾霭 (当大楼进入 400px+ 高空至平流层 2200px 时展现壮美的高空风与云雾)
+    if (altitude > 400) {
+      const mistIntensity = Math.min(1.0, (altitude - 400) / 600) * Math.max(0, 1.0 - (altitude - 2400) / 1000);
+      if (mistIntensity > 0.05) {
+        this.ctx.save();
+        const now = performance.now() * 0.001;
+
+        // 柔美横向飘逸卷云微风薄雾 (Cirrus Mist Ribbons)
+        for (let r = 0; r < 2; r++) {
+          const ribbonSpeed = (r === 0 ? 0.35 : 0.55);
+          const ribbonShift = (now * 25 * ribbonSpeed + r * 160) % (this.baseWidth + 200) - 100;
+          const ribbonY = (r === 0 ? this.baseHeight * 0.32 : this.baseHeight * 0.62) + Math.sin(now * 1.5 + r) * 15;
+
+          const mistGrad = this.ctx.createLinearGradient(ribbonShift, ribbonY - 20, ribbonShift + 220, ribbonY + 20);
+          mistGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+          mistGrad.addColorStop(0.3, `rgba(240, 249, 255, ${0.12 * mistIntensity})`);
+          mistGrad.addColorStop(0.7, `rgba(224, 242, 254, ${0.08 * mistIntensity})`);
+          mistGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+          this.ctx.fillStyle = mistGrad;
+          this.ctx.beginPath();
+          this.ctx.moveTo(ribbonShift, ribbonY);
+          this.ctx.bezierCurveTo(ribbonShift + 60, ribbonY - 14, ribbonShift + 140, ribbonY + 14, ribbonShift + 220, ribbonY);
+          this.ctx.bezierCurveTo(ribbonShift + 150, ribbonY + 24, ribbonShift + 70, ribbonY + 18, ribbonShift, ribbonY);
+          this.ctx.fill();
+        }
+
+        // 高空疾风流光微粒细线 (High-Altitude Aerodynamic Wind Streaks)
+        const streakCount = 6;
+        for (let s = 0; s < streakCount; s++) {
+          const sSpeed = 110 + s * 30; // 快速掠过的风速
+          const sLen = 30 + (s % 3) * 15;
+          const sX = ((now * sSpeed + s * 95) % (this.baseWidth + sLen * 2)) - sLen;
+          const sY = ((s * 137 + altitude * 0.35) % (this.baseHeight - 120)) + 60;
+
+          const streakGrad = this.ctx.createLinearGradient(sX, sY, sX + sLen, sY);
+          streakGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+          streakGrad.addColorStop(0.6, `rgba(224, 242, 254, ${0.32 * mistIntensity})`);
+          streakGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+          this.ctx.strokeStyle = streakGrad;
+          this.ctx.lineWidth = 1.2;
+          this.ctx.beginPath();
+          this.ctx.moveTo(sX, sY);
+          this.ctx.lineTo(sX + sLen, sY);
+          this.ctx.stroke();
+        }
+
+        this.ctx.restore();
+      }
+    }
   }
 
   // 绘制大楼塔
   drawTower() {
     const isRetro = this.theme === 'retro';
     const groundY = this.baseHeight - 120;
-
-    // 地基平台 (地表) 渲染
-    this.ctx.save();
-    this.ctx.fillStyle = isRetro ? '#0f380f' : '#27ae60';
-    
     const groundDrawY = groundY + this.camera.y;
-    this.ctx.fillRect(0, groundDrawY, this.baseWidth, 120);
 
-    if (!isRetro) {
-      this.ctx.fillStyle = '#3e2723';
-      this.ctx.fillRect(0, groundDrawY + 6, this.baseWidth, 114);
+    // 1. 地基平台与城市地坪精致景观渲染 (仅在视野范围内绘制)
+    if (groundDrawY < this.baseHeight + 120) {
+      this.ctx.save();
+      if (isRetro) {
+        // 复古 Game Boy 像素地坪
+        this.ctx.fillStyle = '#0f380f';
+        this.ctx.fillRect(0, groundDrawY, this.baseWidth, 120);
+        this.ctx.fillStyle = '#306230';
+        this.ctx.fillRect(0, groundDrawY, this.baseWidth, 6);
+        this.ctx.fillStyle = '#8bac0f';
+        this.ctx.fillRect(0, groundDrawY, this.baseWidth, 2);
+      } else {
+        // 1.1 北欧生态草坪层 (Lush Nordic Lawn)
+        const lawnGrad = this.ctx.createLinearGradient(0, groundDrawY, 0, groundDrawY + 12);
+        lawnGrad.addColorStop(0, '#16a34a');
+        lawnGrad.addColorStop(1, '#15803d');
+        this.ctx.fillStyle = lawnGrad;
+        this.ctx.fillRect(0, groundDrawY, this.baseWidth, 12);
+
+        // 草坪边缘精致高光草尖
+        this.ctx.fillStyle = '#4ade80';
+        this.ctx.fillRect(0, groundDrawY, this.baseWidth, 2.5);
+
+        // 1.2 城市广场花岗岩地砖步道 (Urban Granite Flagstone Pavement)
+        const paveY = groundDrawY + 12;
+        const paveH = 18;
+        const paveGrad = this.ctx.createLinearGradient(0, paveY, 0, paveY + paveH);
+        paveGrad.addColorStop(0, '#64748b');
+        paveGrad.addColorStop(0.5, '#475569');
+        paveGrad.addColorStop(1, '#334155');
+        this.ctx.fillStyle = paveGrad;
+        this.ctx.fillRect(0, paveY, this.baseWidth, paveH);
+
+        // 广场路缘石与垂直地砖接缝
+        this.ctx.fillStyle = '#94a3b8';
+        this.ctx.fillRect(0, paveY, this.baseWidth, 1.5);
+        this.ctx.strokeStyle = 'rgba(15, 23, 42, 0.45)';
+        this.ctx.lineWidth = 1;
+        for (let px = 8; px < this.baseWidth; px += 26) {
+          this.ctx.beginPath();
+          this.ctx.moveTo(px, paveY + 1.5);
+          this.ctx.lineTo(px, paveY + paveH);
+          this.ctx.stroke();
+        }
+
+        // 1.3 深层夯实防震岩层与地质层 (Sub-base Bedrock & Strata)
+        const rockY = paveY + paveH;
+        const rockGrad = this.ctx.createLinearGradient(0, rockY, 0, this.baseHeight);
+        rockGrad.addColorStop(0, '#1e293b');
+        rockGrad.addColorStop(0.3, '#0f172a');
+        rockGrad.addColorStop(1, '#020617');
+        this.ctx.fillStyle = rockGrad;
+        this.ctx.fillRect(0, rockY, this.baseWidth, Math.max(90, this.baseHeight - rockY + 100));
+
+        // 地质层水平夯实纹理
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+        this.ctx.lineWidth = 1.5;
+        this.ctx.beginPath();
+        this.ctx.moveTo(0, rockY + 14); this.ctx.lineTo(this.baseWidth, rockY + 14);
+        this.ctx.moveTo(0, rockY + 36); this.ctx.lineTo(this.baseWidth, rockY + 36);
+        this.ctx.moveTo(0, rockY + 68); this.ctx.lineTo(this.baseWidth, rockY + 68);
+        this.ctx.stroke();
+      }
+      this.ctx.restore();
+
+      // 2. 第一层大楼承托「北欧花岗岩防震双阶基座 (Granite Plinth Foundation)」
+      const plinthCenterX = (this.tower.length > 0) ? this.tower[0].x : (this.baseWidth / 2);
+      this.ctx.save();
+      if (isRetro) {
+        // 复古石基
+        const pW = this.blockWidth + 20;
+        this.ctx.fillStyle = '#306230';
+        this.ctx.fillRect(plinthCenterX - pW / 2, groundDrawY - 6, pW, 12);
+        this.ctx.fillStyle = '#8bac0f';
+        this.ctx.fillRect(plinthCenterX - pW / 2, groundDrawY - 6, pW, 2);
+        this.ctx.strokeStyle = '#0f380f';
+        this.ctx.strokeRect(plinthCenterX - pW / 2, groundDrawY - 6, pW, 12);
+      } else {
+        const baseW = this.blockWidth;
+        // 2.1 宽下阶 (Lower Foundation Tier)
+        const tier1W = baseW + 28;
+        const tier1H = 12;
+        const tier1Y = groundDrawY + 1;
+        const t1Grad = this.ctx.createLinearGradient(0, tier1Y, 0, tier1Y + tier1H);
+        t1Grad.addColorStop(0, '#334155');
+        t1Grad.addColorStop(1, '#1e293b');
+        this.ctx.fillStyle = t1Grad;
+        this.ctx.strokeStyle = '#475569';
+        this.ctx.lineWidth = 1;
+        this.drawRoundedRect(plinthCenterX - tier1W / 2, tier1Y, tier1W, tier1H, 3);
+        this.ctx.fill();
+        this.ctx.stroke();
+
+        // 防震工业高强螺栓铆钉点缀 (左右各两个)
+        this.ctx.fillStyle = '#94a3b8';
+        const rivetY = tier1Y + tier1H / 2;
+        [plinthCenterX - tier1W / 2 + 6, plinthCenterX - tier1W / 2 + 15, plinthCenterX + tier1W / 2 - 15, plinthCenterX + tier1W / 2 - 6].forEach(rx => {
+          this.ctx.beginPath();
+          this.ctx.arc(rx, rivetY, 2.2, 0, TWO_PI);
+          this.ctx.fill();
+          this.ctx.fillStyle = '#ffffff';
+          this.ctx.fillRect(rx - 0.7, rivetY - 0.7, 1.4, 1.4);
+          this.ctx.fillStyle = '#94a3b8';
+        });
+
+        // 2.2 承压上阶与香槟金防震扣台 (Upper Plinth Bearing Platform)
+        const tier2W = baseW + 12;
+        const tier2H = 10;
+        const tier2Y = groundDrawY - 8;
+        const t2Grad = this.ctx.createLinearGradient(0, tier2Y, 0, tier2Y + tier2H);
+        t2Grad.addColorStop(0, '#475569');
+        t2Grad.addColorStop(1, '#334155');
+        this.ctx.fillStyle = t2Grad;
+        this.ctx.strokeStyle = '#64748b';
+        this.ctx.lineWidth = 1;
+        this.drawRoundedRect(plinthCenterX - tier2W / 2, tier2Y, tier2W, tier2H, 3);
+        this.ctx.fill();
+        this.ctx.stroke();
+
+        // 顶面香槟金钢构防震卡槽扣边 (Seismic Gold Lock Trim)
+        this.ctx.strokeStyle = '#ffd166';
+        this.ctx.lineWidth = 1.6;
+        this.ctx.beginPath();
+        this.ctx.moveTo(plinthCenterX - tier2W / 2 + 2, tier2Y + 0.5);
+        this.ctx.lineTo(plinthCenterX + tier2W / 2 - 2, tier2Y + 0.5);
+        this.ctx.stroke();
+
+        // 中央工业铭牌徽标 (Foundation Plaque)
+        this.ctx.fillStyle = '#0f172a';
+        this.ctx.fillRect(plinthCenterX - 18, tier2Y + 2.5, 36, 5);
+        this.ctx.fillStyle = '#94a3b8';
+        this.ctx.font = 'bold 4.5px monospace';
+        this.ctx.textAlign = 'center';
+        this.ctx.fillText('TB-FOUNDATION', plinthCenterX, tier2Y + 6.2);
+
+        // 第一层方块底部环境遮挡接触阴影 (Ambient Occlusion Shadow)
+        if (this.tower.length > 0) {
+          const shadowGrad = this.ctx.createLinearGradient(0, groundDrawY - 1, 0, groundDrawY + 4);
+          shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0.45)');
+          shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          this.ctx.fillStyle = shadowGrad;
+          this.ctx.fillRect(plinthCenterX - baseW / 2 - 2, groundDrawY - 1, baseW + 4, 5);
+        }
+      }
+      this.ctx.restore();
     }
-    this.ctx.restore();
 
     // 遍历绘制每一层北欧风格楼房 (性能优化：for 循环)
     const towerLen = this.tower.length;
