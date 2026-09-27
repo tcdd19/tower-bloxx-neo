@@ -553,12 +553,18 @@ class ResidentParachute {
 }
 
 // ==========================================================================
-// 1. 音效合成系统 (Web Audio API)
+// 1. 音效与背景音乐合成系统 (Web Audio API)
 // ==========================================================================
 class SoundSynth {
   constructor() {
     this.ctx = null;
     this.enabled = true;
+    this.musicEnabled = true;
+    this.bgmGain = null;
+    this.bgmTimer = null;
+    this.bgmPlaying = false;
+    this.bgmStep = 0;
+    this.nextNoteTime = 0;
   }
 
   init() {
@@ -571,6 +577,202 @@ class SoundSynth {
     } catch (e) {
       console.warn("AudioContext 初始化跳过:", e);
     }
+  }
+
+  // ==========================================
+  // BGM 纯代码 8-bit / Chiptune 实时合成引擎
+  // ==========================================
+  initBGM() {
+    if (!this.ctx || this.bgmGain) return;
+    try {
+      this.bgmGain = this.ctx.createGain();
+      this.bgmGain.gain.setValueAtTime(0.045, this.ctx.currentTime);
+      this.bgmGain.connect(this.ctx.destination);
+    } catch (e) {}
+  }
+
+  startBGM() {
+    if (!this.musicEnabled) return;
+    this.init();
+    if (!this.ctx) return;
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
+    this.initBGM();
+
+    if (this.bgmPlaying) return;
+    this.bgmPlaying = true;
+    this.bgmStep = 0;
+    this.nextNoteTime = this.ctx.currentTime + 0.05;
+    if (this.bgmGain) {
+      this.bgmGain.gain.setValueAtTime(0.045, this.ctx.currentTime);
+    }
+
+    if (this.bgmTimer) clearInterval(this.bgmTimer);
+    this.bgmTimer = setInterval(() => this.scheduleBGM(), 40);
+  }
+
+  stopBGM() {
+    if (this.bgmTimer) {
+      clearInterval(this.bgmTimer);
+      this.bgmTimer = null;
+    }
+    this.bgmPlaying = false;
+    this.bgmStep = 0;
+    if (this.bgmGain && this.ctx) {
+      try {
+        this.bgmGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.08);
+      } catch (e) {}
+    }
+  }
+
+  pauseBGM() {
+    if (this.bgmTimer) {
+      clearInterval(this.bgmTimer);
+      this.bgmTimer = null;
+    }
+    this.bgmPlaying = false;
+    if (this.bgmGain && this.ctx) {
+      try {
+        this.bgmGain.gain.setTargetAtTime(0, this.ctx.currentTime, 0.04);
+      } catch (e) {}
+    }
+  }
+
+  resumeBGM() {
+    if (!this.musicEnabled) return;
+    if (this.bgmPlaying) return;
+    this.init();
+    if (!this.ctx) return;
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume().catch(() => {});
+    }
+    this.initBGM();
+
+    this.bgmPlaying = true;
+    this.nextNoteTime = this.ctx.currentTime + 0.05;
+    if (this.bgmGain) {
+      this.bgmGain.gain.setValueAtTime(0.045, this.ctx.currentTime);
+    }
+    if (this.bgmTimer) clearInterval(this.bgmTimer);
+    this.bgmTimer = setInterval(() => this.scheduleBGM(), 40);
+  }
+
+  setMusicEnabled(enabled) {
+    this.musicEnabled = !!enabled;
+    if (this.musicEnabled) {
+      this.resumeBGM();
+    } else {
+      this.pauseBGM();
+    }
+  }
+
+  scheduleBGM() {
+    if (!this.ctx || !this.bgmPlaying || !this.bgmGain) return;
+    const stepDuration = 0.118; // ~127 BPM 16分音符节奏
+
+    // 经典诺基亚 / 8-bit 复古欢快大调主旋律序列 (64 步循环)
+    const melodySeq = [
+      523.25, 0, 659.25, 0, 783.99, 0, 659.25, 0, 523.25, 587.33, 659.25, 0, 587.33, 0, 392.00, 0,
+      523.25, 0, 659.25, 0, 880.00, 0, 783.99, 0, 659.25, 0, 587.33, 523.25, 587.33, 0, 0, 0,
+      659.25, 0, 783.99, 0, 523.25, 0, 587.33, 0, 659.25, 698.46, 659.25, 587.33, 523.25, 0, 440.00, 0,
+      392.00, 0, 523.25, 0, 659.25, 0, 587.33, 0, 523.25, 0, 0, 0, 0, 0, 0, 0
+    ];
+
+    // 欢快弹性质感行走贝斯 (64 步循环)
+    const bassSeq = [
+      130.81, 0, 130.81, 0, 196.00, 0, 196.00, 0, 220.00, 0, 220.00, 0, 164.81, 0, 164.81, 0,
+      174.61, 0, 174.61, 0, 130.81, 0, 130.81, 0, 146.83, 0, 146.83, 0, 196.00, 0, 196.00, 0,
+      130.81, 0, 130.81, 0, 164.81, 0, 164.81, 0, 174.61, 0, 174.61, 0, 220.00, 0, 220.00, 0,
+      196.00, 0, 196.00, 0, 196.00, 0, 246.94, 0, 130.81, 0, 196.00, 0, 130.81, 0, 0, 0
+    ];
+
+    while (this.nextNoteTime < this.ctx.currentTime + 0.18) {
+      const step = this.bgmStep % melodySeq.length;
+      const mNote = melodySeq[step];
+      const bNote = bassSeq[step];
+
+      if (mNote > 0) {
+        this.playMelodyNote(mNote, this.nextNoteTime, 0.095);
+      }
+      if (bNote > 0) {
+        this.playBassNote(bNote, this.nextNoteTime, 0.12);
+      }
+      if (step % 4 === 2) {
+        this.playHiHat(this.nextNoteTime);
+      }
+
+      this.nextNoteTime += stepDuration;
+      this.bgmStep++;
+    }
+  }
+
+  playMelodyNote(freq, time, duration = 0.095) {
+    if (!freq || !this.ctx || !this.bgmGain) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const noteGain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, time);
+
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(1600, time);
+
+      noteGain.gain.setValueAtTime(0, time);
+      noteGain.gain.linearRampToValueAtTime(0.04, time + 0.008);
+      noteGain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+
+      osc.connect(filter);
+      filter.connect(noteGain);
+      noteGain.connect(this.bgmGain);
+
+      osc.start(time);
+      osc.stop(time + duration + 0.015);
+    } catch (e) {}
+  }
+
+  playBassNote(freq, time, duration = 0.12) {
+    if (!freq || !this.ctx || !this.bgmGain) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const noteGain = this.ctx.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, time);
+
+      noteGain.gain.setValueAtTime(0, time);
+      noteGain.gain.linearRampToValueAtTime(0.065, time + 0.01);
+      noteGain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+
+      osc.connect(noteGain);
+      noteGain.connect(this.bgmGain);
+
+      osc.start(time);
+      osc.stop(time + duration + 0.015);
+    } catch (e) {}
+  }
+
+  playHiHat(time) {
+    if (!this.ctx || !this.bgmGain) return;
+    try {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(5500, time);
+      osc.frequency.exponentialRampToValueAtTime(180, time + 0.025);
+
+      gain.gain.setValueAtTime(0.015, time);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.025);
+
+      osc.connect(gain);
+      gain.connect(this.bgmGain);
+
+      osc.start(time);
+      osc.stop(time + 0.03);
+    } catch (e) {}
   }
 
   playDrop() {
@@ -1028,6 +1230,7 @@ class TowerBloxxGame {
       maxComboVal: document.getElementById('max-combo-val'),
       gameOverReasonText: document.getElementById('game-over-reason-text'),
       toggleSound: document.getElementById('toggle-sound'),
+      toggleMusic: document.getElementById('toggle-music'),
       toggleVibrate: document.getElementById('toggle-vibrate'),
       btnStart: document.getElementById('btn-start-game'),
       btnSettings: document.getElementById('btn-open-settings'),
@@ -1085,13 +1288,17 @@ class TowerBloxxGame {
     bindBtn(this.dom.btnResumeGame, () => this.resumeGame());
     bindBtn(this.dom.btnPauseHome, () => this.goHome());
 
-    // D2: 页面不可见时暂停循环，节省电池
+    // D2: 页面不可见时暂停循环与背景音乐，节省电池与资源
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
         this._pageHidden = true;
+        if (this.synth) this.synth.pauseBGM();
       } else {
         this._pageHidden = false;
         this.lastTime = performance.now();
+        if (this.state === 'PLAYING' && this.synth) {
+          this.synth.resumeBGM();
+        }
       }
     });
 
@@ -1100,6 +1307,25 @@ class TowerBloxxGame {
         this.synth.enabled = e.target.checked;
       });
     }
+
+    if (this.dom.toggleMusic) {
+      let savedMusic = true;
+      try {
+        const val = localStorage.getItem('tb_music_enabled');
+        if (val !== null) savedMusic = (val === 'true');
+      } catch (e) {}
+      this.dom.toggleMusic.checked = savedMusic;
+      this.synth.setMusicEnabled(savedMusic);
+
+      this.dom.toggleMusic.addEventListener('change', (e) => {
+        const enabled = e.target.checked;
+        this.synth.setMusicEnabled(enabled);
+        try {
+          localStorage.setItem('tb_music_enabled', enabled);
+        } catch (err) {}
+      });
+    }
+
     if (this.dom.toggleVibrate) {
       this.dom.toggleVibrate.addEventListener('change', (e) => {
         this.haptics.enabled = e.target.checked;
@@ -1247,6 +1473,11 @@ class TowerBloxxGame {
       this.showElement(this.dom.tapInstruction, 'block');
       
       this.updateHUD();
+
+      // 启动 8-bit 背景音乐
+      if (this.synth) {
+        this.synth.startBGM();
+      }
     } catch (err) {
       console.error("❌ startGame 异常防爆:", err);
       if (this.dom && this.dom.startMenu) {
@@ -1259,12 +1490,14 @@ class TowerBloxxGame {
   pauseGame() {
     if (this.state !== 'PLAYING') return;
     this.state = 'PAUSED';
+    if (this.synth) this.synth.pauseBGM();
     this.showElement(this.dom.pauseMenu, 'flex');
   }
 
   resumeGame() {
     if (this.state !== 'PAUSED') return;
     this.state = 'PLAYING';
+    if (this.synth) this.synth.resumeBGM();
     this.hideElement(this.dom.pauseMenu);
   }
 
@@ -1280,6 +1513,7 @@ class TowerBloxxGame {
 
   goHome() {
     this.state = 'MENU';
+    if (this.synth) this.synth.stopBGM();
     this.hideElement(this.dom.gameOverScreen);
     this.hideElement(this.dom.pauseMenu);
     this.hideElement(this.dom.victoryMenu);
@@ -1362,6 +1596,7 @@ class TowerBloxxGame {
 
   triggerGameOver(reason) {
     this.state = 'GAMEOVER';
+    if (this.synth) this.synth.stopBGM();
     try {
       this.synth.playGameOver();
     } catch (e) {
@@ -1404,6 +1639,7 @@ class TowerBloxxGame {
   // 50 层摩天大楼完美封顶胜利结算
   triggerVictory() {
     this.state = 'VICTORY';
+    if (this.synth) this.synth.stopBGM();
     this.synth.playPerfect(10);
     this.haptics.vibratePerfect();
 
@@ -1515,6 +1751,14 @@ class TowerBloxxGame {
         if (b.y > this.baseHeight + 200) {
           this.collapseBlocks.splice(i, 1);
         }
+      }
+    }
+
+    // 更新大楼楼层落地物理微挤压回弹计时 (Squash & Stretch)
+    for (let i = 0; i < this.tower.length; i++) {
+      const b = this.tower[i];
+      if (b.squashTimer !== undefined && b.squashTimer < b.squashDuration) {
+        b.squashTimer += dt;
       }
     }
 
@@ -1777,15 +2021,26 @@ class TowerBloxxGame {
     this.population += popAdd;
     this.triggerShake(isPerfect ? 6 : 4, 10); // 落地打压震屏
 
-    // 压入已固定的楼层列表
+    // 压入已固定的楼层列表 (带有物理打击弹性 Squash & Stretch 数据)
     this.tower.push({
       x: previousBlock ? previousBlock.x + blockOffsetX : targetX + blockOffsetX,
       y: landing.y,
       w: landing.w,
       h: landing.h,
       offsetX: blockOffsetX,
-      landingAngle: landing.angle || (dx / landing.w * 0.25)
+      landingAngle: landing.angle || (dx / landing.w * 0.25),
+      squashTimer: 0,
+      squashDuration: isPerfect ? 200 : 160,
+      squashIntensity: isPerfect ? 0.14 : 0.09
     });
+
+    // 冲击力轻微传导至下层大楼 (让整座塔更有重量质感)
+    if (this.tower.length >= 2) {
+      const prevBlock = this.tower[this.tower.length - 2];
+      prevBlock.squashTimer = 0;
+      prevBlock.squashDuration = 130;
+      prevBlock.squashIntensity = 0.05;
+    }
 
     this.updateHUD();
 
@@ -2792,7 +3047,28 @@ class TowerBloxxGame {
       if (drawY > this.baseHeight + 100 || drawY < -100) continue;
 
       const blockAngle = block.landingAngle || (this.towerSway.offset * 0.005);
-      this.drawScandinavianBlock(drawX, drawY, block.w, block.h, isRetro, idx, blockAngle);
+
+      // 物理打击微挤压回弹 (Squash & Stretch)：模拟真实建筑咬合与自重冲击弹性
+      let curW = block.w;
+      let curH = block.h;
+      let renderY = drawY;
+
+      if (block.squashTimer !== undefined && block.squashTimer < block.squashDuration) {
+        const progress = block.squashTimer / block.squashDuration;
+        // 衰减阻尼正弦弹簧波形：先迅速压扁 (sin > 0)，再轻微向上拉伸回弹 (sin < 0)，随后平稳锁合
+        const wave = Math.sin(progress * Math.PI * 2) * Math.exp(-progress * 3.5);
+        const squashAmount = wave * (block.squashIntensity || 0.1);
+
+        const scaleY = 1.0 - squashAmount; // 纵向压缩微形变
+        const scaleX = 1.0 + squashAmount * 0.65; // 横向体积守恒微膨胀
+
+        curH = block.h * scaleY;
+        curW = block.w * scaleX;
+        // 关键点：底边始终牢固锚定在下层屋顶，产生顶部向下微凹沉落的真实打击感！
+        renderY = drawY + (block.h - curH);
+      }
+
+      this.drawScandinavianBlock(drawX, renderY, curW, curH, isRetro, idx, blockAngle);
     }
 
     // 🌟 【高能连击金光状态】：连击 >= 3 时，顶楼与连击楼层自带紧贴楼体的流金微光光晕 (绝不再悬空脱离楼体)
