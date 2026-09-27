@@ -1117,39 +1117,119 @@ class SoundSynth {
       console.warn("竖琴琶音播放跳过:", e);
     }
   }
+
+  // iPhone / iOS 专属：底壳扬声器超低频触觉共振 (Acoustic Haptic Thud)
+  // 在 38Hz ~ 62Hz 激发极短暂的瞬态冲击波，使手持 iPhone 的手掌产生真实的机械打击与下坠震手感
+  playAcousticHaptic(type = 'light') {
+    if (!this.enabled) return;
+    try {
+      this.init();
+      if (!this.ctx) return;
+      if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+
+      if (type === 'heavy') {
+        // Perfect 落地：清脆紧致的 58Hz -> 36Hz 重低音下沉冲量
+        osc.frequency.setValueAtTime(58, now);
+        osc.frequency.exponentialRampToValueAtTime(36, now + 0.045);
+        gain.gain.setValueAtTime(0.55, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.start(now);
+        osc.stop(now + 0.055);
+      } else if (type === 'celebration') {
+        // 连击庆典：双段低音弹跳
+        osc.frequency.setValueAtTime(65, now);
+        osc.frequency.exponentialRampToValueAtTime(40, now + 0.06);
+        gain.gain.setValueAtTime(0.6, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+        osc.start(now);
+        osc.stop(now + 0.075);
+      } else if (type === 'fail') {
+        // 没放稳/摔落：粗粝 42Hz 低频震颤
+        osc.frequency.setValueAtTime(42, now);
+        osc.frequency.linearRampToValueAtTime(26, now + 0.12);
+        gain.gain.setValueAtTime(0.65, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        osc.start(now);
+        osc.stop(now + 0.13);
+      } else {
+        // 普通落地 (light)：轻巧 52Hz 瞬态微冲
+        osc.frequency.setValueAtTime(52, now);
+        osc.frequency.exponentialRampToValueAtTime(34, now + 0.035);
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+        osc.start(now);
+        osc.stop(now + 0.045);
+      }
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+    } catch (e) {}
+  }
 }
 
 // ==========================================================================
-// 2. 触觉震动系统 (Vibration API)
+// 2. 触觉震动系统 (Vibration API + iOS Safari Taptic Engine 双引擎)
 // ==========================================================================
 class HapticsController {
-  constructor() {
+  constructor(synth = null) {
     this.enabled = true;
+    this.synth = synth;
+    this.iosTrigger = null;
   }
 
-  vibrate(pattern) {
-    if (!this.enabled || !navigator.vibrate) return;
+  init() {
+    if (!this.iosTrigger && typeof document !== 'undefined') {
+      this.iosTrigger = document.getElementById('ios-haptic-trigger');
+    }
+  }
+
+  // 触发物理震动 (全平台双保险：Android/PC 支持 navigator.vibrate，iOS 触发 Taptic Engine + 物理低频共振)
+  vibrate(pattern, acousticType = 'light') {
+    if (!this.enabled) return;
+
+    // 1. 标准 Vibration API (支持 Android Chrome/Edge/Firefox 等)
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try {
+        navigator.vibrate(pattern);
+      } catch (e) {}
+    }
+
+    // 2. iOS Safari 原生 Taptic Engine 触发 (利用 iOS 17.4+ 原生 switch 控件的系统振动反射)
     try {
-      navigator.vibrate(pattern);
-    } catch (e) {
-      console.warn("震动 API 触发失败:", e);
+      this.init();
+      if (this.iosTrigger) {
+        this.iosTrigger.click();
+      }
+    } catch (e) {}
+
+    // 3. iPhone / iOS 物理低频共振脉冲 (Acoustic Haptic Pulse)
+    // 利用 iPhone 底部立体声扬声器在掌心直接激发出 38Hz~58Hz 瞬态超低频机械触感，
+    // 即使在没有 navigator.vibrate 的任何 iOS Safari 设备上，也能在手掌中清晰感受到真实的敲击与落地阻尼感！
+    if (this.synth) {
+      this.synth.playAcousticHaptic(acousticType);
     }
   }
 
   vibrateLand() {
-    this.vibrate(40);
+    this.vibrate(40, 'light');
   }
 
   vibratePerfect() {
-    this.vibrate([35, 30, 45]);
+    this.vibrate([35, 30, 45], 'heavy');
   }
 
   vibrateCelebration() {
-    this.vibrate([40, 50, 60, 50, 100]);
+    this.vibrate([40, 50, 60, 50, 100], 'celebration');
   }
 
   vibrateFail() {
-    this.vibrate(250);
+    this.vibrate(250, 'fail');
   }
 }
 
@@ -1349,7 +1429,7 @@ class TowerBloxxGame {
 
     // 初始化外设/粒子/漂浮文字
     this.synth = new SoundSynth();
-    this.haptics = new HapticsController();
+    this.haptics = new HapticsController(this.synth);
     this.particles = new ParticleSystem();
     this.floatingTexts = [];
     
@@ -4709,7 +4789,7 @@ class TowerBloxxGame {
     this.ctx.closePath();
   }
 
-  // 画布缩放自适应尺寸计算
+  // 画布缩放自适应尺寸计算 (全面屏手机与 PC 双向动态匹配)
   resizeCanvas() {
     const parent = this.canvas.parentElement;
     let parentWidth = parent ? parent.clientWidth : 0;
@@ -4717,16 +4797,20 @@ class TowerBloxxGame {
 
     // 如果因为样式文件未完成加载，导致获取的 clientWidth 或 clientHeight 为 0
     if (parentWidth === 0 || parentHeight === 0) {
-      parentWidth = Math.min(window.innerWidth, 480);
-      parentHeight = Math.min(window.innerHeight, 850);
-      setTimeout(() => this.resizeCanvas(), 500);
+      parentWidth = window.innerWidth;
+      parentHeight = window.innerHeight;
+      setTimeout(() => this.resizeCanvas(), 250);
     }
 
     // 计算逻辑 480 宽度到实际设备容器屏幕宽度的自适应比例 Factor
     this.scaleFactor = parentWidth / this.baseWidth;
 
-    this.canvas.width = parentWidth * this.dpr;
-    this.canvas.height = parentHeight * this.dpr;
+    // 🌟 动态计算逻辑视口高度：精准适配 iPhone (19.5:9)、全面屏手机与电脑模拟器 (16:9)！
+    // 逻辑高度根据设备实际纵横比自适应，确保地表地基永远固定在屏幕底边、仪表盘贴靠底角！
+    this.baseHeight = Math.max(800, parentHeight / this.scaleFactor);
+
+    this.canvas.width = Math.round(parentWidth * this.dpr);
+    this.canvas.height = Math.round(parentHeight * this.dpr);
 
     this.canvas.style.width = `${parentWidth}px`;
     this.canvas.style.height = `${parentHeight}px`;

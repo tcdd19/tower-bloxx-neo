@@ -2,7 +2,10 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#05070a">
   <title>摩天大楼：重塑版 (Tower Bloxx Neo)</title>
   <meta name="description" content="经典诺基亚盖楼游戏《摩天大楼》的现代 HTML5 重置版，完美支持物理摆动与手机震动反馈。">
   <link rel="stylesheet" href="style.css">
@@ -191,6 +194,11 @@
     </div>
   </div>
   
+  <!-- iOS Safari Taptic Engine 触觉震动反射器 (利用 iOS 17.4+ 原生 switch 特性触发系统级 Taptic Engine) -->
+  <label id="ios-haptic-trigger" style="display:none; position:absolute; pointer-events:none;" aria-hidden="true">
+    <input type="checkbox" switch id="ios-haptic-input">
+  </label>
+
   <script src="game.js"></script>
 </body>
 </html>

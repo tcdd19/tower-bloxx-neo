@@ -49,15 +49,18 @@ body.theme-retro {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 html, body {
   width: 100%;
   height: 100%;
+  height: 100dvh;
   overflow: hidden;
   background-color: #05070a;
   font-family: var(--font-display);
   color: var(--color-text-main);
+  touch-action: manipulation;
 }
 
 body.theme-retro {
@@ -710,3 +713,53 @@ body.theme-retro .result-value {
     transform: translateY(0);
   }
 }
+
+/* ==========================================================================
+   全面屏手机与 iPhone 极致全屏沉浸适配
+   ========================================================================== */
+@media (max-width: 600px) {
+  html, body {
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+  }
+
+  #app-container {
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    padding: 0;
+    margin: 0;
+  }
+
+  #game-wrapper {
+    width: 100% !important;
+    height: 100% !important;
+    height: 100dvh !important;
+    max-width: 100% !important;
+    max-height: 100% !important;
+    aspect-ratio: auto !important; /* 彻底打破 9:16 黑边限制，无黑边满屏沉浸！ */
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* 顶部 HUD 避让 iPhone 刘海屏 / 灵动岛 */
+  .hud-container {
+    top: max(14px, env(safe-area-inset-top, 14px)) !important;
+    left: max(10px, env(safe-area-inset-left, 10px)) !important;
+    right: max(10px, env(safe-area-inset-right, 10px)) !important;
+  }
+
+  /* 底部提示文字避让 iPhone 底部横条 Home Indicator */
+  .tap-instruction {
+    bottom: max(16px, env(safe-area-inset-bottom, 16px)) !important;
+  }
+
+  /* 弹窗菜单避让安全区 */
+  .menu-overlay {
+    padding-top: max(30px, env(safe-area-inset-top, 30px)) !important;
+    padding-bottom: max(30px, env(safe-area-inset-bottom, 30px)) !important;
+  }
+}
+
