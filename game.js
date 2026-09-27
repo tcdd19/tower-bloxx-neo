@@ -3849,8 +3849,11 @@ class TowerBloxxGame {
     this.ctx.lineTo(rx + depthX, y - depthY);
     this.ctx.stroke();
 
-    // ======= 3. 正面墙体 (带主题渐变 + 建筑线纹 + 金属铆钉 + 底部遮挡阴影) =======
+    // ======= 3. 正面墙体 (物理微倒角 + 石材工字错缝 + 防震锚栓 + 挑檐企口) =======
     this.ctx.shadowBlur = 0;
+    const actualIdx = (idx === 999) ? this.tower.length : idx;
+
+    // 3.1 正面墙体基础材质渐变
     const gradFront = this.ctx.createLinearGradient(lx, y, lx, y + h);
     gradFront.addColorStop(0, pal.frontTop);
     gradFront.addColorStop(0.4, pal.frontBase);
@@ -3859,25 +3862,97 @@ class TowerBloxxGame {
     this.ctx.fillRect(lx, y, w, h);
     this.ctx.strokeRect(lx, y, w, h);
 
-    // 底部环境遮挡阴影 (Ambient Occlusion Shadow)
-    const aoGrad = this.ctx.createLinearGradient(lx, y + h - 6, lx, y + h);
-    aoGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    aoGrad.addColorStop(1, 'rgba(0, 0, 0, 0.22)');
-    this.ctx.fillStyle = aoGrad;
-    this.ctx.fillRect(lx, y + h - 6, w, 6);
-
-    // 外墙水平建材缝隙分割线 (精细纹理)
-    this.ctx.strokeStyle = pal.seamLine;
-    this.ctx.lineWidth = 1;
+    // 3.2 墙体 45° 物理微倒角光刃 (Bevel Chamfer Specular Rim)
+    // 顶部与左侧受光边 (米白/香槟微倒角高光，宽度 1.2px)
+    this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.42)';
+    this.ctx.lineWidth = 1.2;
     this.ctx.beginPath();
-    this.ctx.moveTo(lx + 2, y + h * 0.33);
-    this.ctx.lineTo(rx - 2, y + h * 0.33);
-    this.ctx.moveTo(lx + 2, y + h * 0.66);
-    this.ctx.lineTo(rx - 2, y + h * 0.66);
+    this.ctx.moveTo(lx + 1, y + h - 1);
+    this.ctx.lineTo(lx + 1, y + 1);
+    this.ctx.lineTo(rx - 1, y + 1);
     this.ctx.stroke();
 
-    // 正面顶精细香槟金护栏饰条 (纤细 3.5px)
-    const gradRoof = this.ctx.createLinearGradient(lx, y, rx, y);
+    // 底部与右侧背光边 (深色倒角微阴影，塑造如同乐高实体积木的温润倒角质感)
+    this.ctx.strokeStyle = 'rgba(0, 0, 0, 0.32)';
+    this.ctx.lineWidth = 1.2;
+    this.ctx.beginPath();
+    this.ctx.moveTo(rx - 1, y + 1);
+    this.ctx.lineTo(rx - 1, y + h - 1);
+    this.ctx.lineTo(lx + 1, y + h - 1);
+    this.ctx.stroke();
+
+    // 3.3 底部环境遮挡接触暗缝与阴影 (Ambient Occlusion & Crevice Slit)
+    const aoGrad = this.ctx.createLinearGradient(lx, y + h - 6, lx, y + h);
+    aoGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    aoGrad.addColorStop(0.7, 'rgba(0, 0, 0, 0.18)');
+    aoGrad.addColorStop(1, 'rgba(0, 0, 0, 0.38)');
+    this.ctx.fillStyle = aoGrad;
+    this.ctx.fillRect(lx + 1, y + h - 6, w - 2, 6);
+
+    // 接触咬合暗槽企口线 (Interlock Crevice Slit)
+    this.ctx.strokeStyle = 'rgba(3, 4, 94, 0.45)';
+    this.ctx.lineWidth = 1.0;
+    this.ctx.beginPath();
+    this.ctx.moveTo(lx + 2, y + h - 0.5);
+    this.ctx.lineTo(rx - 2, y + h - 0.5);
+    this.ctx.stroke();
+
+    // 3.4 北欧陶土砖/石板交错工字拼缝 (Subtle Interlocking Brick Joints)
+    const h1 = y + h * 0.33;
+    const h2 = y + h * 0.66;
+    this.ctx.strokeStyle = pal.seamLine;
+    this.ctx.lineWidth = 0.9;
+    this.ctx.beginPath();
+    this.ctx.moveTo(lx + 2, h1); this.ctx.lineTo(rx - 2, h1);
+    this.ctx.moveTo(lx + 2, h2); this.ctx.lineTo(rx - 2, h2);
+    this.ctx.stroke();
+
+    // 微妙交错的垂直工字短缝
+    const jointsCourses = [
+      { yTop: y + 2, yBot: h1, xs: [lx + w * 0.25, lx + w * 0.5, lx + w * 0.75] },
+      { yTop: h1, yBot: h2, xs: [lx + w * 0.125, lx + w * 0.375, lx + w * 0.625, lx + w * 0.875] },
+      { yTop: h2, yBot: y + h - 2, xs: [lx + w * 0.25, lx + w * 0.5, lx + w * 0.75] }
+    ];
+    for (let c = 0; c < jointsCourses.length; c++) {
+      const course = jointsCourses[c];
+      for (let j = 0; j < course.xs.length; j++) {
+        const jx = course.xs[j];
+        this.ctx.strokeStyle = pal.seamLine;
+        this.ctx.beginPath();
+        this.ctx.moveTo(jx, course.yTop + 1);
+        this.ctx.lineTo(jx, course.yBot - 1);
+        this.ctx.stroke();
+      }
+    }
+
+    // 3.5 结构四角建筑防震锚栓垫片 (Architectural Tie-Rod Anchor Plates)
+    const tieCorners = [
+      { cx: lx + 5, cy: y + 6 },
+      { cx: rx - 5, cy: y + 6 },
+      { cx: lx + 5, cy: y + h - 6 },
+      { cx: rx - 5, cy: y + h - 6 }
+    ];
+    for (let tc = 0; tc < tieCorners.length; tc++) {
+      const { cx, cy } = tieCorners[tc];
+      this.ctx.fillStyle = '#0f172a';
+      this.ctx.beginPath();
+      this.ctx.moveTo(cx, cy - 2.2);
+      this.ctx.lineTo(cx + 2.2, cy);
+      this.ctx.lineTo(cx, cy + 2.2);
+      this.ctx.lineTo(cx - 2.2, cy);
+      this.ctx.closePath();
+      this.ctx.fill();
+
+      this.ctx.fillStyle = pal.accentGold;
+      this.ctx.fillRect(cx - 0.7, cy - 0.7, 1.4, 1.4);
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.fillRect(cx - 0.4, cy - 0.4, 0.8, 0.8);
+    }
+
+    // 3.6 正面顶部出挑滴水挑檐 (Cornice Drip Edge with Champagne Accent, 出挑 1.5px)
+    const corniceW = w + 3;
+    const corniceX = lx - 1.5;
+    const gradRoof = this.ctx.createLinearGradient(corniceX, y - 2, rx + 1.5, y + 2);
     gradRoof.addColorStop(0, '#fff3b0');
     gradRoof.addColorStop(0.3, pal.accentGold);
     gradRoof.addColorStop(0.7, '#e2b050');
@@ -3885,47 +3960,343 @@ class TowerBloxxGame {
     this.ctx.fillStyle = gradRoof;
     this.ctx.strokeStyle = outlineColor;
     this.ctx.lineWidth = 1.2;
-    this.ctx.fillRect(lx, y - 1, w, 3.5);
-    this.ctx.strokeRect(lx, y - 1, w, 3.5);
+    this.ctx.fillRect(corniceX, y - 2, corniceW, 4);
+    this.ctx.strokeRect(corniceX, y - 2, corniceW, 4);
 
-    // 护栏上的金属加固铆钉 (Corner rivets)
-    this.ctx.fillStyle = '#03045e';
-    this.ctx.fillRect(lx + 1, y, 1.5, 1.5);
-    this.ctx.fillRect(rx - 2.5, y, 1.5, 1.5);
+    // 挑檐下方深邃阴影 (Cornice Underside Shadow)
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+    this.ctx.fillRect(lx, y + 2, w, 2.5);
 
-    // 饰条下方暗部阴影
-    this.ctx.fillStyle = 'rgba(0,0,0,0.15)';
-    this.ctx.fillRect(lx, y + 3, w, 1.5);
-
-    // ======= 4. 走心双窗户 =======
-    const windowW = Math.max(10, Math.floor(w * 0.22));
-    const windowH = Math.max(14, Math.floor(h * 0.44));
-    const wy = y + (h - windowH) / 2 + 3;
-    this.drawSingleWindow(x - windowW - 4, wy, windowW, windowH, idx);
-    this.drawSingleWindow(x + 4, wy, windowW, windowH, idx + 1);
+    // ======= 4. 楼层构型差异化 (1F 豪华大堂入口 + 3 种标准层立面轮换) =======
+    if (actualIdx === 0) {
+      // 1F：豪华大厦挑高落地迎宾大堂与雨棚门斗
+      this.drawGrandLobbyEntrance(x, y, w, h, pal, outlineColor);
+    } else {
+      const archetype = (actualIdx - 1) % 3;
+      if (archetype === 0) {
+        // 风格 A：经典北欧双联法式窗 + 悬挑铸铁微阳台 + 鲜花绿植
+        const windowW = Math.max(10, Math.floor(w * 0.22));
+        const windowH = Math.max(14, Math.floor(h * 0.44));
+        const wy = y + (h - windowH) / 2 + 3;
+        this.drawSingleWindow(x - windowW - 4, wy, windowW, windowH, actualIdx, true);
+        this.drawSingleWindow(x + 4, wy, windowW, windowH, actualIdx + 1, true);
+      } else if (archetype === 1) {
+        // 风格 B：现代大开间全景采光飘窗 + 铝合金水平遮阳百叶
+        this.drawPanoramicRibbonWindow(x, y, w, h, pal, actualIdx);
+      } else {
+        // 风格 C：雅致三联拱券窗 + 拱顶锁石
+        this.drawTripleArchedWindows(x, y, w, h, pal, actualIdx);
+      }
+    }
 
     this.ctx.restore();
   }
 
-  // 辅助函数：走心窗户绘制 (白色立体框 + 窗台底座 + 窗帘剪影 + 窗台花坛绿植 + 玻璃高光)
-  drawSingleWindow(x, y, w, h, animationSeed) {
-    // 1. 窗户下方的黑蓝色窗台 ledge
-    this.ctx.fillStyle = '#012a4a';
-    this.ctx.fillRect(x - 2, y + h + 1, w + 4, 3);
+  // 1F 豪华挑高迎宾大堂入口门斗 (Grand Ground Entrance Lobby)
+  drawGrandLobbyEntrance(x, y, w, h, pal, outlineColor) {
+    const lx = x - w / 2;
+    const rx = x + w / 2;
 
-    // 2. 3D 白色外窗框
+    // 1. 两侧通高大理石基柱 (Flanking Marble Pilasters)
+    const pilasterW = 9;
+    const pGrad = this.ctx.createLinearGradient(0, y, 0, y + h);
+    pGrad.addColorStop(0, '#334155');
+    pGrad.addColorStop(1, '#0f172a');
+    this.ctx.fillStyle = pGrad;
+    this.ctx.fillRect(lx + 2, y + 3, pilasterW, h - 3);
+    this.ctx.fillRect(rx - pilasterW - 2, y + 3, pilasterW, h - 3);
+    this.ctx.strokeStyle = '#64748b';
+    this.ctx.lineWidth = 1;
+    this.ctx.strokeRect(lx + 2, y + 3, pilasterW, h - 3);
+    this.ctx.strokeRect(rx - pilasterW - 2, y + 3, pilasterW, h - 3);
+
+    // 2. 两侧落地展示玻璃橱窗 (Display Sidelight Windows)
+    const sideWinW = Math.max(8, Math.floor(w * 0.13));
+    const sideWinH = Math.floor(h * 0.52);
+    const sideWinY = y + h - sideWinH - 2;
+    this.drawSingleWindow(lx + pilasterW + 3, sideWinY, sideWinW, sideWinH, 0, false);
+    this.drawSingleWindow(rx - pilasterW - sideWinW - 3, sideWinY, sideWinW, sideWinH, 2, false);
+
+    // 3. 中央双开豪华大堂门 (Grand Entrance Double Doors)
+    const doorW = Math.floor(w * 0.40);
+    const doorH = Math.floor(h * 0.68);
+    const doorX = x - doorW / 2;
+    const doorY = y + h - doorH - 1;
+
+    // 门洞内凹深阴影槽
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.48)';
+    this.ctx.fillRect(doorX - 2, doorY - 2, doorW + 4, doorH + 2);
+
+    // 门框大理石包边
+    this.ctx.fillStyle = '#1e293b';
+    this.ctx.fillRect(doorX - 1, doorY - 1, doorW + 2, doorH + 1);
+    this.ctx.strokeStyle = pal.accentGold;
+    this.ctx.lineWidth = 1;
+    this.ctx.strokeRect(doorX - 1, doorY - 1, doorW + 2, doorH + 1);
+
+    // 豪华大堂室内暖黄辉光 (Grand Lobby Radiance)
+    const lobbyGrad = this.ctx.createLinearGradient(doorX, doorY, doorX, doorY + doorH);
+    lobbyGrad.addColorStop(0, '#fffbeb');
+    lobbyGrad.addColorStop(0.3, '#fef08a');
+    lobbyGrad.addColorStop(0.8, '#f59e0b');
+    lobbyGrad.addColorStop(1, '#b45309');
+    this.ctx.fillStyle = lobbyGrad;
+    this.ctx.fillRect(doorX, doorY, doorW, doorH);
+
+    // 双开玻璃门中缝
+    this.ctx.strokeStyle = '#0f172a';
+    this.ctx.lineWidth = 1.2;
+    this.ctx.beginPath();
+    this.ctx.moveTo(x, doorY);
+    this.ctx.lineTo(x, doorY + doorH);
+    this.ctx.stroke();
+
+    // 左右门把手 (金色亮线)
+    this.ctx.strokeStyle = '#ffffff';
+    this.ctx.lineWidth = 1.5;
+    this.ctx.beginPath();
+    this.ctx.moveTo(x - 3, doorY + doorH * 0.4);
+    this.ctx.lineTo(x - 3, doorY + doorH * 0.75);
+    this.ctx.moveTo(x + 3, doorY + doorH * 0.4);
+    this.ctx.lineTo(x + 3, doorY + doorH * 0.75);
+    this.ctx.stroke();
+
+    // 门楣金色标牌 "GRAND LOBBY 1F"
+    this.ctx.fillStyle = '#0f172a';
+    this.ctx.fillRect(x - 17, doorY - 7, 34, 6);
+    this.ctx.strokeStyle = pal.accentGold;
+    this.ctx.strokeRect(x - 17, doorY - 7, 34, 6);
+    this.ctx.fillStyle = '#ffd166';
+    this.ctx.font = 'bold 4.5px monospace';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText('GRAND LOBBY', x, doorY - 2.5);
+
+    // 4. 悬挑金属玻璃雨棚门斗 (Entrance Cantilevered Canopy)
+    const canopyW = doorW + 18;
+    const canopyH = 4.5;
+    const canopyX = x - canopyW / 2;
+    const canopyY = doorY - 9;
+
+    this.ctx.fillStyle = 'rgba(224, 242, 254, 0.78)';
+    this.ctx.fillRect(canopyX, canopyY, canopyW, canopyH);
+    this.ctx.strokeStyle = pal.accentGold;
+    this.ctx.lineWidth = 1.2;
+    this.ctx.strokeRect(canopyX, canopyY, canopyW, canopyH);
+
+    // 雨棚两侧金属拉索 (Tension Cables)
+    this.ctx.strokeStyle = '#94a3b8';
+    this.ctx.lineWidth = 1;
+    this.ctx.beginPath();
+    this.ctx.moveTo(canopyX + 2, canopyY);
+    this.ctx.lineTo(canopyX + 6, canopyY - 7);
+    this.ctx.moveTo(canopyX + canopyW - 2, canopyY);
+    this.ctx.lineTo(canopyX + canopyW - 6, canopyY - 7);
+    this.ctx.stroke();
+
+    // 雨棚下方投射的暖色迎宾射灯光晕 (Downlight Sconce Glow)
+    const downlightGrad = this.ctx.createRadialGradient(x, canopyY + canopyH, 1, x, canopyY + canopyH + 10, 16);
+    downlightGrad.addColorStop(0, 'rgba(254, 240, 138, 0.65)');
+    downlightGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+    this.ctx.fillStyle = downlightGrad;
+    this.ctx.beginPath();
+    this.ctx.arc(x, canopyY + canopyH + 6, 15, 0, TWO_PI);
+    this.ctx.fill();
+  }
+
+  // 现代大开间全景采光飘窗 + 水平铝合金遮阳百叶 (Modern Panoramic Ribbon Window)
+  drawPanoramicRibbonWindow(x, y, w, h, pal, seed) {
+    const ribbonW = Math.floor(w * 0.72);
+    const ribbonH = Math.floor(h * 0.44);
+    const rx = x - ribbonW / 2;
+    const ry = y + (h - ribbonH) / 2 + 3;
+
+    // 1. 顶部水平铝合金遮阳百叶 (Sunshade Louvers)
+    const louverY = ry - 6;
+    for (let l = 0; l < 3; l++) {
+      const ly = louverY + l * 2;
+      this.ctx.fillStyle = '#94a3b8';
+      this.ctx.fillRect(rx - 2, ly, ribbonW + 4, 1.2);
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.fillRect(rx - 2, ly, ribbonW + 4, 0.6);
+    }
+
+    // 2. 窗洞深嵌内阴影槽 (Recessed Reveal)
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    this.ctx.fillRect(rx - 2, ry - 2, ribbonW + 4, ribbonH + 4);
+
+    // 3. 3D 白色外窗框
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.fillRect(rx - 1, ry - 1, ribbonW + 2, ribbonH + 2);
+    this.ctx.strokeStyle = '#03045e';
+    this.ctx.lineWidth = 1;
+    this.ctx.strokeRect(rx - 1, ry - 1, ribbonW + 2, ribbonH + 2);
+
+    // 4. 全景中空玻璃与室内光晕 (Loft Glow)
+    const isLit = (this.camera.y > 450 && seed % 2 === 0) || (seed % 3 === 0);
+    const glassGrad = this.ctx.createLinearGradient(rx, ry, rx, ry + ribbonH);
+    if (isLit) {
+      glassGrad.addColorStop(0, '#fffbeb');
+      glassGrad.addColorStop(0.35, '#fef08a');
+      glassGrad.addColorStop(1, '#f59e0b');
+    } else {
+      glassGrad.addColorStop(0, '#bae6fd');
+      glassGrad.addColorStop(0.5, '#60a5fa');
+      glassGrad.addColorStop(1, '#1d4ed8');
+    }
+    this.ctx.fillStyle = glassGrad;
+    this.ctx.fillRect(rx, ry, ribbonW, ribbonH);
+
+    // 5. 三联竖向金属窗柱分格 (Vertical Mullions)
+    this.ctx.strokeStyle = '#03045e';
+    this.ctx.lineWidth = 1.2;
+    this.ctx.beginPath();
+    this.ctx.moveTo(rx + ribbonW * 0.33, ry);
+    this.ctx.lineTo(rx + ribbonW * 0.33, ry + ribbonH);
+    this.ctx.moveTo(rx + ribbonW * 0.66, ry);
+    this.ctx.lineTo(rx + ribbonW * 0.66, ry + ribbonH);
+    this.ctx.stroke();
+
+    // 6. 双层中空玻璃双道物理掠光 (Double-Glazed Dual Sheen)
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    this.ctx.beginPath();
+    this.ctx.moveTo(rx, ry);
+    this.ctx.lineTo(rx + ribbonW * 0.32, ry);
+    this.ctx.lineTo(rx + ribbonW * 0.12, ry + ribbonH);
+    this.ctx.lineTo(rx, ry + ribbonH);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.30)';
+    this.ctx.beginPath();
+    this.ctx.moveTo(rx + ribbonW * 0.38, ry);
+    this.ctx.lineTo(rx + ribbonW * 0.46, ry);
+    this.ctx.lineTo(rx + ribbonW * 0.26, ry + ribbonH);
+    this.ctx.lineTo(rx + ribbonW * 0.18, ry + ribbonH);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    // 7. 出挑大理石窗台石 (Projected Sill)
+    const sillW = ribbonW + 6;
+    const sillX = rx - 3;
+    const sillY = ry + ribbonH;
+    this.ctx.fillStyle = '#1e293b';
+    this.ctx.fillRect(sillX, sillY, sillW, 3.5);
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+    this.ctx.fillRect(sillX, sillY, sillW, 1.0);
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    this.ctx.fillRect(sillX, sillY + 3.5, sillW, 2);
+  }
+
+  // 雅致三联拱券窗 + 拱顶锁石 (Triple Slender Arched Casements with Keystones)
+  drawTripleArchedWindows(x, y, w, h, pal, seed) {
+    const archW = Math.max(9, Math.floor(w * 0.17));
+    const archH = Math.max(14, Math.floor(h * 0.48));
+    const spacing = Math.floor(w * 0.27);
+    const winY = y + (h - archH) / 2 + 4;
+
+    const xs = [x - spacing, x, x + spacing];
+    for (let i = 0; i < 3; i++) {
+      const wx = xs[i] - archW / 2;
+      const isLit = (this.camera.y > 450 && (seed + i) % 2 === 0) || ((seed + i) % 3 === 0);
+
+      // 1. 拱洞深嵌内阴影
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+      this.ctx.beginPath();
+      this.ctx.arc(xs[i], winY + archW / 2, archW / 2 + 1.5, Math.PI, 0);
+      this.ctx.rect(wx - 1.5, winY + archW / 2, archW + 3, archH - archW / 2 + 2);
+      this.ctx.fill();
+
+      // 2. 白色拱券外包边 (Arched Casing)
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.beginPath();
+      this.ctx.arc(xs[i], winY + archW / 2, archW / 2 + 0.8, Math.PI, 0);
+      this.ctx.rect(wx - 0.8, winY + archW / 2, archW + 1.6, archH - archW / 2 + 1);
+      this.ctx.fill();
+
+      // 3. 玻璃颜料与室内温馨灯光
+      const glassGrad = this.ctx.createLinearGradient(wx, winY, wx, winY + archH);
+      if (isLit) {
+        glassGrad.addColorStop(0, '#fffbeb');
+        glassGrad.addColorStop(0.35, '#fef08a');
+        glassGrad.addColorStop(1, '#f59e0b');
+      } else {
+        glassGrad.addColorStop(0, '#bae6fd');
+        glassGrad.addColorStop(0.5, '#60a5fa');
+        glassGrad.addColorStop(1, '#1d4ed8');
+      }
+      this.ctx.fillStyle = glassGrad;
+      this.ctx.beginPath();
+      this.ctx.arc(xs[i], winY + archW / 2, archW / 2, Math.PI, 0);
+      this.ctx.rect(wx, winY + archW / 2, archW, archH - archW / 2);
+      this.ctx.fill();
+
+      // 4. 拱顶横向中梁 (Transom Bar) 与中央竖梃
+      this.ctx.strokeStyle = '#ffffff';
+      this.ctx.lineWidth = 1.0;
+      this.ctx.beginPath();
+      this.ctx.moveTo(wx, winY + archW / 2);
+      this.ctx.lineTo(wx + archW, winY + archW / 2);
+      this.ctx.moveTo(xs[i], winY + archW / 2);
+      this.ctx.lineTo(xs[i], winY + archH);
+      this.ctx.stroke();
+
+      // 5. 拱顶中央香槟金锁石 (Keystone)
+      this.ctx.fillStyle = pal.accentGold;
+      this.ctx.beginPath();
+      this.ctx.moveTo(xs[i] - 2, winY - 2.5);
+      this.ctx.lineTo(xs[i] + 2, winY - 2.5);
+      this.ctx.lineTo(xs[i] + 1.2, winY + 1.5);
+      this.ctx.lineTo(xs[i] - 1.2, winY + 1.5);
+      this.ctx.closePath();
+      this.ctx.fill();
+      this.ctx.strokeStyle = '#03045e';
+      this.ctx.lineWidth = 0.8;
+      this.ctx.stroke();
+
+      // 6. 玻璃掠光
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
+      this.ctx.beginPath();
+      this.ctx.moveTo(wx, winY + archW / 2);
+      this.ctx.lineTo(wx + archW * 0.4, winY + archW / 2);
+      this.ctx.lineTo(wx + archW * 0.15, winY + archH);
+      this.ctx.lineTo(wx, winY + archH);
+      this.ctx.closePath();
+      this.ctx.fill();
+
+      // 7. 出挑窗台石
+      this.ctx.fillStyle = '#0f172a';
+      this.ctx.fillRect(wx - 2, winY + archH, archW + 4, 3);
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+      this.ctx.fillRect(wx - 2, winY + archH, archW + 4, 0.8);
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      this.ctx.fillRect(wx - 2, winY + archH + 3, archW + 4, 1.8);
+    }
+  }
+
+  // 经典法式窗户绘制 (白色立体框 + 窗洞深嵌内阴影 + 出挑窗台石 + 悬挑铸铁微阳台 + 垂吊花池 + 双层掠光)
+  drawSingleWindow(x, y, w, h, animationSeed, showBalcony = true) {
+    // 1. 窗洞深嵌内阴影槽 (Recessed Reveal & Inner Cavity Shadow)
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    this.ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
+
+    // 2. 3D 白色外窗框 (Molded Window Casing)
     this.ctx.fillStyle = '#ffffff';
     this.ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
     this.ctx.strokeStyle = '#03045e';
     this.ctx.lineWidth = 1;
     this.ctx.strokeRect(x - 1, y - 1, w + 2, h + 2);
 
-    // 3. 玻璃颜料与灯光 (高空/傍晚亮灯或温馨暖灯)
+    // 窗洞顶部内阴影 (强调墙体厚度与凹陷深度)
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    this.ctx.fillRect(x, y, w, 2);
+    this.ctx.fillRect(x, y, 1.5, h);
+
+    // 3. 玻璃颜料与室内温馨灯光 (高空/傍晚亮灯或温馨暖灯)
     let isLit = (this.camera.y > 450 && animationSeed % 2 === 0) || (animationSeed % 5 === 0);
     const glassGrad = this.ctx.createLinearGradient(x, y, x, y + h);
     if (isLit) {
       glassGrad.addColorStop(0, '#fffbeb');
-      glassGrad.addColorStop(0.4, '#fef08a');
+      glassGrad.addColorStop(0.35, '#fef08a');
       glassGrad.addColorStop(1, '#f59e0b');
     } else {
       glassGrad.addColorStop(0, '#bae6fd');
@@ -3935,34 +4306,43 @@ class TowerBloxxGame {
     this.ctx.fillStyle = glassGrad;
     this.ctx.fillRect(x, y, w, h);
 
-    // 4. 温馨小窗帘 (随机出现在部分窗户)
+    // 4. 温馨小窗帘 (带褶皱层次感)
     if (animationSeed % 3 === 0) {
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
       // 左窗帘
       this.ctx.beginPath();
       this.ctx.moveTo(x, y);
-      this.ctx.lineTo(x + w * 0.28, y);
-      this.ctx.lineTo(x + w * 0.12, y + h * 0.8);
-      this.ctx.lineTo(x, y + h * 0.8);
+      this.ctx.lineTo(x + w * 0.30, y);
+      this.ctx.lineTo(x + w * 0.12, y + h * 0.82);
+      this.ctx.lineTo(x, y + h * 0.82);
       this.ctx.closePath();
       this.ctx.fill();
       // 右窗帘
       this.ctx.beginPath();
       this.ctx.moveTo(x + w, y);
-      this.ctx.lineTo(x + w * 0.72, y);
-      this.ctx.lineTo(x + w * 0.88, y + h * 0.8);
-      this.ctx.lineTo(x + w, y + h * 0.8);
+      this.ctx.lineTo(x + w * 0.70, y);
+      this.ctx.lineTo(x + w * 0.88, y + h * 0.82);
+      this.ctx.lineTo(x + w, y + h * 0.82);
       this.ctx.closePath();
       this.ctx.fill();
     }
 
-    // 5. 玻璃对角线高光 Sheen Slash (极具通透晶莹光泽感)
-    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    // 5. 双层中空玻璃双道物理掠光 (Double-Glazed Dual Specular Sheen)
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.48)';
     this.ctx.beginPath();
     this.ctx.moveTo(x, y);
-    this.ctx.lineTo(x + w * 0.45, y);
-    this.ctx.lineTo(x + w * 0.15, y + h);
+    this.ctx.lineTo(x + w * 0.38, y);
+    this.ctx.lineTo(x + w * 0.12, y + h);
     this.ctx.lineTo(x, y + h);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+    this.ctx.beginPath();
+    this.ctx.moveTo(x + w * 0.44, y);
+    this.ctx.lineTo(x + w * 0.54, y);
+    this.ctx.lineTo(x + w * 0.28, y + h);
+    this.ctx.lineTo(x + w * 0.18, y + h);
     this.ctx.closePath();
     this.ctx.fill();
 
@@ -3976,35 +4356,91 @@ class TowerBloxxGame {
     this.ctx.lineTo(x + w, y + h / 2);
     this.ctx.stroke();
 
-    // 7. 窗台微型绿植花池与鲜花 (Mini Balcony Flower Box)
-    if (animationSeed % 2 === 1) {
-      // 花盆底座 (深铁艺)
-      this.ctx.fillStyle = '#1e293b';
-      this.ctx.fillRect(x - 1, y + h - 1, w + 2, 3.5);
+    // 7. 出挑花岗岩窗台石 (Projected Stone Sill)
+    const sillW = w + 5;
+    const sillX = x - 2.5;
+    const sillY = y + h;
+    this.ctx.fillStyle = '#0f172a';
+    this.ctx.fillRect(sillX, sillY, sillW, 3.5);
+    // 窗台石受光高光
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    this.ctx.fillRect(sillX, sillY, sillW, 1.0);
+    // 窗台石在墙体上的投影
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.32)';
+    this.ctx.fillRect(sillX, sillY + 3.5, sillW, 2.0);
 
-      // 嫩绿叶丛
+    // 8. 悬挑法式铁艺微阳台与鲜花花池 (French Juliet Balcony & Flowers)
+    if (showBalcony) {
+      const balconyY = y + h - 5;
+      const balconyH = 9;
+      const balconyW = w + 4;
+      const bx = x - 2;
+
+      // 8.1 栏杆投射在墙面上的立体阴影 (Cast Shadow)
+      this.ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
+      this.ctx.fillRect(bx + 1.5, balconyY + 2, balconyW, 2);
+      this.ctx.fillRect(bx + 1.5, balconyY + balconyH, balconyW, 2);
+
+      // 8.2 黑色铸铁花箱底座
+      this.ctx.fillStyle = '#1e293b';
+      this.ctx.fillRect(bx, balconyY + 2, balconyW, balconyH - 2);
+
+      // 8.3 葱郁绿植叶丛与垂吊常春藤藤蔓
       const leafColors = ['#22c55e', '#16a34a', '#15803d'];
-      for (let li = 0; li < 3; li++) {
-        const lx = x + 2.5 + li * (w - 5) / 2;
+      for (let li = 0; li < 4; li++) {
+        const lx = bx + 3 + li * (balconyW - 6) / 3;
         this.ctx.fillStyle = leafColors[li % 3];
         this.ctx.beginPath();
-        this.ctx.arc(lx, y + h - 2.5, 2.0, 0, TWO_PI);
+        this.ctx.arc(lx, balconyY + 1, 2.2, 0, TWO_PI);
         this.ctx.fill();
       }
 
-      // 缤纷鲜花小花朵 (粉红、明黄、纯白点缀)
+      // 垂吊常春藤细藤蔓 (2 根微垂)
+      this.ctx.strokeStyle = '#15803d';
+      this.ctx.lineWidth = 1;
+      this.ctx.beginPath();
+      this.ctx.moveTo(bx + 5, balconyY + 5);
+      this.ctx.lineTo(bx + 4, balconyY + 11);
+      this.ctx.moveTo(bx + balconyW - 6, balconyY + 4);
+      this.ctx.lineTo(bx + balconyW - 5, balconyY + 10);
+      this.ctx.stroke();
+
+      // 缤纷鲜花花朵 (粉红、明黄、纯白、淡紫点缀)
       const flowerColors = ['#f43f5e', '#fbbf24', '#ffffff', '#c084fc'];
       const fColor1 = flowerColors[animationSeed % flowerColors.length];
       const fColor2 = flowerColors[(animationSeed + 2) % flowerColors.length];
 
       this.ctx.fillStyle = fColor1;
       this.ctx.beginPath();
-      this.ctx.arc(x + w * 0.28, y + h - 4.0, 1.4, 0, TWO_PI);
+      this.ctx.arc(bx + balconyW * 0.28, balconyY - 0.5, 1.5, 0, TWO_PI);
       this.ctx.fill();
 
       this.ctx.fillStyle = fColor2;
       this.ctx.beginPath();
-      this.ctx.arc(x + w * 0.72, y + h - 4.0, 1.4, 0, TWO_PI);
+      this.ctx.arc(bx + balconyW * 0.72, balconyY - 0.5, 1.5, 0, TWO_PI);
+      this.ctx.fill();
+
+      // 8.4 铸铁雕花围栏条 (Black Iron Juliet Railing)
+      this.ctx.strokeStyle = '#0f172a';
+      this.ctx.lineWidth = 1.2;
+      // 顶扶手
+      this.ctx.strokeRect(bx, balconyY, balconyW, balconyH);
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      this.ctx.fillRect(bx, balconyY, balconyW, 0.8);
+
+      // 4 根垂直铸铁花杆
+      for (let s = 1; s <= 4; s++) {
+        const sx = bx + s * (balconyW / 5);
+        this.ctx.beginPath();
+        this.ctx.moveTo(sx, balconyY);
+        this.ctx.lineTo(sx, balconyY + balconyH);
+        this.ctx.stroke();
+      }
+
+      // 中央金色铜花徽标 (Brass Rosette)
+      this.ctx.fillStyle = '#ffd166';
+      this.ctx.beginPath();
+      this.ctx.arc(bx + balconyW / 2, balconyY + balconyH / 2, 1.2, 0, TWO_PI);
       this.ctx.fill();
     }
   }
