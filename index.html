@@ -52,11 +52,12 @@
           <span class="hud-label">居民</span>
           <span id="population-val" class="hud-value font-mono">0</span>
         </div>
+        <button id="btn-hud-pause" class="hud-pause-btn" onclick="pauseGameDirectly(event)" title="暂停游戏 (Esc / P)" aria-label="暂停游戏">⏸</button>
       </div>
 
-      <!-- 提示轻触屏幕的遮罩层 (在游戏中显示，提示移动端用户) -->
+      <!-- 提示轻触屏幕的遮罩层 (在游戏中显示，提示移动端与桌面端用户) -->
       <div id="tap-instruction" class="tap-hint-overlay hidden">
-        <span>点击屏幕 / 空格 / 回车 释放楼层 | Esc 暂停</span>
+        <span>轻触屏幕 / 按空格键 释放楼层</span>
       </div>
 
       <!-- 开始菜单弹窗 -->
@@ -185,10 +186,10 @@
       <!-- 暂停菜单弹窗 -->
       <div id="pause-menu" class="menu-overlay hidden">
         <h2 class="menu-title">游戏暂停</h2>
-        <p class="game-subtitle">按 Esc 或 P 键继续</p>
+        <p class="game-subtitle">休息一下，随时继续盖楼</p>
         <div class="button-group">
-          <button id="btn-resume-game" class="btn btn-primary">继续游戏</button>
-          <button id="btn-pause-home" class="btn btn-secondary">返回主菜单</button>
+          <button id="btn-resume-game" class="btn btn-primary" onclick="resumeGameDirectly(event)">继续游戏</button>
+          <button id="btn-pause-home" class="btn btn-secondary" onclick="goHomeDirectly(event)">返回主菜单</button>
         </div>
       </div>
     </div>

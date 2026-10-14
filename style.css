@@ -235,6 +235,46 @@ body.theme-retro .heart.active {
   animation: none;
 }
 
+/* 顶部 HUD 右侧毛玻璃暂停按钮 (专为手机与触屏设计) */
+.hud-pause-btn {
+  flex: 0 0 38px;
+  width: 38px;
+  min-height: 44px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(var(--blur-amount));
+  -webkit-backdrop-filter: blur(var(--blur-amount));
+  border: 1px solid var(--panel-border);
+  box-shadow: var(--panel-glow);
+  border-radius: 8px;
+  color: var(--color-primary);
+  font-size: 16px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto; /* 允许在 pointer-events:none 的 HUD 容器中独立响应点击 */
+  outline: none;
+  transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+  padding: 0;
+}
+
+.hud-pause-btn:hover {
+  background: rgba(0, 240, 255, 0.14);
+  border-color: var(--color-primary);
+}
+
+.hud-pause-btn:active {
+  transform: scale(0.92);
+}
+
+body.theme-retro .hud-pause-btn {
+  border: 2px solid var(--panel-border);
+  border-radius: 0px;
+  background: transparent;
+  box-shadow: none;
+}
+
 /* ==========================================================================
    轻触提示
    ========================================================================== */
@@ -744,16 +784,52 @@ body.theme-retro .result-value {
     box-shadow: none !important;
   }
 
-  /* 顶部 HUD 避让 iPhone 刘海屏 / 灵动岛 */
+  /* 顶部 HUD 避让 iPhone 刘海屏 / 灵动岛，并针对窄屏做紧凑自适应排版 */
   .hud-container {
-    top: max(14px, env(safe-area-inset-top, 14px)) !important;
-    left: max(10px, env(safe-area-inset-left, 10px)) !important;
-    right: max(10px, env(safe-area-inset-right, 10px)) !important;
+    top: max(12px, env(safe-area-inset-top, 12px)) !important;
+    left: max(8px, env(safe-area-inset-left, 8px)) !important;
+    right: max(8px, env(safe-area-inset-right, 8px)) !important;
+    gap: 4px !important;
+  }
+
+  .hud-item {
+    padding: 4px 3px !important;
+    min-width: 0;
+    border-radius: 7px;
+  }
+
+  .hud-label {
+    font-size: 9px !important;
+    letter-spacing: 0.5px !important;
+    margin-bottom: 1px !important;
+    white-space: nowrap;
+  }
+
+  .hud-value {
+    font-size: 13px !important;
+    white-space: nowrap;
+  }
+
+  #hearts-container {
+    gap: 2px !important;
+  }
+
+  .heart {
+    font-size: 11px !important;
+  }
+
+  .hud-pause-btn {
+    flex: 0 0 34px !important;
+    width: 34px !important;
+    min-height: 38px !important;
+    font-size: 14px !important;
+    border-radius: 7px;
   }
 
   /* 底部提示文字避让 iPhone 底部横条 Home Indicator */
-  .tap-instruction {
-    bottom: max(16px, env(safe-area-inset-bottom, 16px)) !important;
+  #tap-instruction,
+  .tap-hint-overlay {
+    bottom: max(20px, calc(env(safe-area-inset-bottom, 16px) + 8px)) !important;
   }
 
   /* 弹窗菜单避让安全区 */

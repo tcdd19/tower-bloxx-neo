@@ -1543,6 +1543,7 @@ class TowerBloxxGame {
       btnThemeRetro: document.getElementById('btn-theme-retro'),
       // C1/E4: 新增 DOM 引用
       pauseMenu: document.getElementById('pause-menu'),
+      btnHudPause: document.getElementById('btn-hud-pause'),
       btnResumeGame: document.getElementById('btn-resume-game'),
       btnPauseHome: document.getElementById('btn-pause-home'),
       populationVal: document.getElementById('population-val'),
@@ -1587,6 +1588,10 @@ class TowerBloxxGame {
     bindBtn(this.dom.btnThemeModern, () => this.setTheme('modern'));
     bindBtn(this.dom.btnThemeRetro, () => this.setTheme('retro'));
 
+    bindBtn(this.dom.btnHudPause, () => {
+      if (this.state === 'PLAYING') this.pauseGame();
+      else if (this.state === 'PAUSED') this.resumeGame();
+    });
     bindBtn(this.dom.btnResumeGame, () => this.resumeGame());
     bindBtn(this.dom.btnPauseHome, () => this.goHome());
 
@@ -1648,7 +1653,7 @@ class TowerBloxxGame {
     const wrapper = document.getElementById('game-wrapper');
     if (wrapper) {
       wrapper.addEventListener('touchstart', (e) => {
-        if (e.target.closest('button, input, label, .hud-item, .switch, .menu-overlay')) return;
+        if (e.target.closest('button, input, label, .hud-item, .hud-pause-btn, .switch, .menu-overlay')) return;
         if (this.state === 'PLAYING') {
           e.preventDefault();
           this.triggerDrop();
@@ -1656,7 +1661,7 @@ class TowerBloxxGame {
       }, { passive: false });
 
       wrapper.addEventListener('mousedown', (e) => {
-        if (e.target.closest('button, input, label, .hud-item, .switch, .menu-overlay')) return;
+        if (e.target.closest('button, input, label, .hud-item, .hud-pause-btn, .switch, .menu-overlay')) return;
         if (this.state === 'PLAYING') {
           this.triggerDrop();
         }
@@ -1726,6 +1731,8 @@ class TowerBloxxGame {
         console.warn("音频防护:", e);
       }
       
+      this._initialHighScore = this.highScore || 0;
+      this._hasBrokenRecordThisRun = false;
       this.score = 0;
       this.population = 0;
       this.combo = 0;
@@ -1843,7 +1850,28 @@ class TowerBloxxGame {
   }
 
   updateHighScoreDisplay() {
-    this.dom.highScoreVal.innerText = this.highScore;
+    if (this.dom.highScoreVal) {
+      this.dom.highScoreVal.innerText = this.highScore;
+    }
+  }
+
+  // 实时刷新最高分存档并在本局首次破纪录时触发金光横幅庆祝
+  checkAndSaveHighScore(popX, popY) {
+    if (this.score > this.highScore) {
+      this.highScore = this.score;
+      this.updateHighScoreDisplay();
+      try {
+        localStorage.setItem('tb_high_score', this.highScore);
+      } catch (e) {}
+
+      if (this._initialHighScore > 0 && !this._hasBrokenRecordThisRun) {
+        this._hasBrokenRecordThisRun = true;
+        const bx = popX || (this.baseWidth / 2);
+        const by = popY || (this.baseHeight * 0.35);
+        this.floatingTexts.push(new FloatingText(bx, by, '🏆 NEW RECORD!', '#ffd166', true));
+        this.particles.emit(bx, by, '#ffd166', 22, this.theme === 'retro');
+      }
+    }
   }
 
   triggerDrop() {
@@ -1958,7 +1986,7 @@ class TowerBloxxGame {
     if (this.score > this.highScore) {
       this.highScore = this.score;
       try {
-        localStorage.setItem('tower_bloxx_highscore', this.highScore);
+        localStorage.setItem('tb_high_score', this.highScore);
       } catch (e) {}
     }
 
@@ -1980,10 +2008,19 @@ class TowerBloxxGame {
     // 奖励 500 居民与 2000 分
     this.population += 500;
     this.score += 2000;
+
+    // 绝境回血奖励：达成里程碑且生命未满时恢复 1 颗心 ♥
+    const topY = this.baseHeight - 120 - this.tower.length * this.blockHeight + this.camera.y;
+    if (this.lives < 3) {
+      this.lives++;
+      this.floatingTexts.push(new FloatingText(this.baseWidth / 2, topY - 90, '❤️ LIFE +1!', '#4ade80', true));
+      this.particles.emit(this.baseWidth / 2, topY - 40, '#4ade80', 20, this.theme === 'retro');
+    }
+
+    this.checkAndSaveHighScore(this.baseWidth / 2, topY - 115);
     this.updateHUD();
 
     // 全屏发射 40 颗粒五彩星光与闪耀粒子
-    const topY = this.baseHeight - 120 - this.tower.length * this.blockHeight + this.camera.y;
     for (let i = 0; i < 40; i++) {
       const fx = this.baseWidth / 2 + (Math.random() - 0.5) * 260;
       const fy = topY - Math.random() * 180;
@@ -2265,6 +2302,13 @@ class TowerBloxxGame {
           cheerColor = '#00f0ff';
         }
         this.floatingTexts.push(new FloatingText(textX, textY - 24, cheerText, cheerColor, true));
+
+        // 绝境回血机制：每达成 10 连击倍数且生命未满 3 颗心时，自动恢复 1 颗心 ♥
+        if (this.combo % 10 === 0 && this.lives < 3) {
+          this.lives++;
+          this.floatingTexts.push(new FloatingText(textX, textY - 48, `❤️ LIFE +1!`, '#4ade80', true));
+          this.particles.emit(landing.x, landingScreenY - 20, '#4ade80', 18, this.theme === 'retro');
+        }
       }
     } else {
       this.combo = 0;
@@ -2362,6 +2406,8 @@ class TowerBloxxGame {
       prevBlock.squashIntensity = 0.05;
     }
 
+    // 实时校验是否刷新历史最高纪录
+    this.checkAndSaveHighScore(landing.x, landingScreenY - 72);
     this.updateHUD();
 
     // 保持大气标准的 80px 宽度 (不再随高度缩窄挤压，保证舒展爽快盖楼体验)
@@ -2404,6 +2450,9 @@ class TowerBloxxGame {
 
     // 2. 渲染云朵与星星 (带摄像机视差)
     this.drawParallaxStarsAndClouds();
+
+    // 2.5 渲染远景多层都会天际线与万家灯火视差背景
+    this.drawCitySkylineParallax();
 
     // 3. 渲染底座公园树木剪影 (渐进式)
     this.drawParkSilhouettes();
@@ -3239,6 +3288,114 @@ class TowerBloxxGame {
     this.ctx.restore();
   }
 
+  // 远景「多层都会天际线剪影与万家灯火」视差背景 (Multi-Layer City Skyline & Warm Lit Windows Parallax)
+  drawCitySkylineParallax() {
+    if (this.theme === 'retro') return;
+
+    const altitude = this.camera.y;
+    // 在 0 ~ 1400px 高度区间呈现多层都市天际线，随高度攀升逐渐没入下方云海
+    if (altitude > 1400) return;
+
+    const fadeAlpha = Math.max(0, 1.0 - Math.max(0, altitude - 450) / 950);
+    if (fadeAlpha <= 0.02) return;
+
+    const groundY = this.baseHeight - 120;
+    this.ctx.save();
+
+    // 1. 远景第一层：朦胧高耸摩天楼群剪影 (0.28x 慢速视差，营造宏大城市纵深感)
+    const farBaseY = groundY + altitude * 0.28;
+    const farBuildings = [
+      { x: -10, w: 54, h: 175, spire: true },
+      { x: 40,  w: 46, h: 135, spire: false },
+      { x: 82,  w: 62, h: 215, spire: true },
+      { x: 140, w: 50, h: 150, spire: false },
+      { x: 300, w: 58, h: 195, spire: true },
+      { x: 354, w: 48, h: 145, spire: false },
+      { x: 398, w: 56, h: 225, spire: true },
+      { x: 448, w: 45, h: 160, spire: false }
+    ];
+
+    this.ctx.globalAlpha = fadeAlpha * 0.42;
+    for (let i = 0; i < farBuildings.length; i++) {
+      const b = farBuildings[i];
+      const by = farBaseY - b.h;
+      if (by > this.baseHeight) continue;
+
+      const bGrad = this.ctx.createLinearGradient(b.x, by, b.x, farBaseY + 60);
+      bGrad.addColorStop(0, '#1e293b');
+      bGrad.addColorStop(1, '#0f172a');
+      this.ctx.fillStyle = bGrad;
+      this.ctx.fillRect(b.x, by, b.w, b.h + 80);
+
+      // 摩天楼顶信号塔尖与红色航空障碍灯
+      if (b.spire) {
+        const sx = b.x + b.w / 2;
+        this.ctx.strokeStyle = '#334155';
+        this.ctx.lineWidth = 1.5;
+        this.ctx.beginPath();
+        this.ctx.moveTo(sx, by);
+        this.ctx.lineTo(sx, by - 24);
+        this.ctx.stroke();
+
+        this.ctx.fillStyle = '#ef4444';
+        this.ctx.beginPath();
+        this.ctx.arc(sx, by - 25, 1.8, 0, TWO_PI);
+        this.ctx.fill();
+      }
+    }
+
+    // 2. 中景第二层：精致都会建筑群与暖黄万家灯火窗格 (0.52x 中速视差)
+    const midBaseY = groundY + altitude * 0.52;
+    const midBuildings = [
+      { x: 6,   w: 48, h: 120, rows: 7, cols: 3 },
+      { x: 50,  w: 54, h: 152, rows: 9, cols: 4 },
+      { x: 100, w: 44, h: 98,  rows: 5, cols: 3 },
+      { x: 332, w: 46, h: 112, rows: 6, cols: 3 },
+      { x: 374, w: 56, h: 162, rows: 9, cols: 4 },
+      { x: 426, w: 50, h: 128, rows: 7, cols: 3 }
+    ];
+
+    this.ctx.globalAlpha = fadeAlpha * 0.68;
+    for (let i = 0; i < midBuildings.length; i++) {
+      const b = midBuildings[i];
+      const by = midBaseY - b.h;
+      if (by > this.baseHeight) continue;
+
+      const mGrad = this.ctx.createLinearGradient(b.x, by, b.x, midBaseY + 40);
+      mGrad.addColorStop(0, '#0f172a');
+      mGrad.addColorStop(1, '#020617');
+      this.ctx.fillStyle = mGrad;
+      this.ctx.fillRect(b.x, by, b.w, b.h + 50);
+
+      // 顶部边缘微弱环境天光轮廓
+      this.ctx.fillStyle = 'rgba(148, 163, 184, 0.25)';
+      this.ctx.fillRect(b.x, by, b.w, 1.5);
+
+      // 点缀温暖万家灯火小窗格
+      const padX = 7;
+      const padY = 10;
+      const availW = b.w - padX * 2;
+      const availH = b.h - padY * 2;
+      const stepX = availW / b.cols;
+      const stepY = availH / b.rows;
+
+      for (let r = 0; r < b.rows; r++) {
+        for (let c = 0; c < b.cols; c++) {
+          // 固定伪随机哈希决定哪些窗户亮起暖灯
+          const hash = (i * 31 + r * 17 + c * 13) % 7;
+          if (hash === 0 || hash === 2 || hash === 5) {
+            this.ctx.fillStyle = (hash === 0) ? 'rgba(254, 240, 138, 0.75)' : 'rgba(251, 191, 36, 0.55)';
+            const wx = b.x + padX + c * stepX + 1.5;
+            const wy = by + padY + r * stepY + 1.5;
+            this.ctx.fillRect(wx, wy, Math.max(2.5, stepX - 4.5), Math.max(3.5, stepY - 5.5));
+          }
+        }
+      }
+    }
+
+    this.ctx.restore();
+  }
+
   // 100% 超高清矢量北欧公园地表元素绘制 (剔除旧版低分辨率贴图)
   drawParkSilhouettes() {
     if (this.theme === 'retro') return;
@@ -4047,10 +4204,13 @@ class TowerBloxxGame {
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.28)';
     this.ctx.fillRect(lx, y + 2, w, 2.5);
 
-    // ======= 4. 楼层构型差异化 (1F 豪华大堂入口 + 3 种标准层立面轮换) =======
+    // ======= 4. 楼层构型差异化 (1F 豪华大堂入口 + 每 10 层黄金空中花园观景层 + 3 种标准层立面轮换) =======
     if (actualIdx === 0) {
       // 1F：豪华大厦挑高落地迎宾大堂与雨棚门斗
       this.drawGrandLobbyEntrance(x, y, w, h, pal, outlineColor);
+    } else if ((actualIdx + 1) % 10 === 0) {
+      // 每 10 层专属里程碑 (10F, 20F, 30F, 40F, 50F...)：黄金全景空中花园观景层 (Sky Lounge & Observation Deck)
+      this.drawSkyLoungeFloor(x, y, w, h, pal, actualIdx + 1);
     } else {
       const archetype = (actualIdx - 1) % 3;
       if (archetype === 0) {
@@ -4061,7 +4221,7 @@ class TowerBloxxGame {
         this.drawSingleWindow(x - windowW - 4, wy, windowW, windowH, actualIdx, true);
         this.drawSingleWindow(x + 4, wy, windowW, windowH, actualIdx + 1, true);
       } else if (archetype === 1) {
-        // 风格 B：现代大开间全景采光飘窗 + 铝合金水平遮阳百叶
+        // 风格 B：现代大开间全景全景采光飘窗 + 铝合金水平遮阳百叶
         this.drawPanoramicRibbonWindow(x, y, w, h, pal, actualIdx);
       } else {
         // 风格 C：雅致三联拱券窗 + 拱顶锁石
@@ -4070,6 +4230,116 @@ class TowerBloxxGame {
     }
 
     this.ctx.restore();
+  }
+
+  // 每 10 层专属里程碑建筑层：黄金全景空中花园观景层 (10F/20F/30F... Sky Lounge & Observation Deck)
+  drawSkyLoungeFloor(x, y, w, h, pal, floorNum) {
+    const lx = x - w / 2;
+    const rx = x + w / 2;
+
+    // 1. 两侧香槟金拉丝金属装饰边柱 (Brushed Brass Corner Columns)
+    const colW = 7;
+    const colGrad = this.ctx.createLinearGradient(0, y, 0, y + h);
+    colGrad.addColorStop(0, '#fef08a');
+    colGrad.addColorStop(0.5, '#f59e0b');
+    colGrad.addColorStop(1, '#b45309');
+    this.ctx.fillStyle = colGrad;
+    this.ctx.fillRect(lx + 1.5, y + 3, colW, h - 4);
+    this.ctx.fillRect(rx - colW - 1.5, y + 3, colW, h - 4);
+    this.ctx.strokeStyle = '#78350f';
+    this.ctx.lineWidth = 0.9;
+    this.ctx.strokeRect(lx + 1.5, y + 3, colW, h - 4);
+    this.ctx.strokeRect(rx - colW - 1.5, y + 3, colW, h - 4);
+
+    // 2. 全景通透黄金观景玻璃幕墙 (Panoramic Sky Lounge Curtain Wall)
+    const glassW = w - colW * 2 - 8;
+    const glassH = Math.floor(h * 0.56);
+    const gx = x - glassW / 2;
+    const gy = y + 12;
+
+    // 窗洞深嵌阴影
+    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+    this.ctx.fillRect(gx - 1.5, gy - 1.5, glassW + 3, glassH + 3);
+
+    // 奢华室内暖金色水晶灯辉光
+    const loungeGrad = this.ctx.createLinearGradient(gx, gy, gx, gy + glassH);
+    loungeGrad.addColorStop(0, '#fffbeb');
+    loungeGrad.addColorStop(0.4, '#fde047');
+    loungeGrad.addColorStop(0.85, '#f59e0b');
+    loungeGrad.addColorStop(1, '#92400e');
+    this.ctx.fillStyle = loungeGrad;
+    this.ctx.fillRect(gx, gy, glassW, glassH);
+
+    // 香槟金幕墙外框与竖向分格 (4 开间观景落地窗)
+    this.ctx.strokeStyle = '#ffd166';
+    this.ctx.lineWidth = 1.2;
+    this.ctx.strokeRect(gx, gy, glassW, glassH);
+    this.ctx.beginPath();
+    for (let m = 1; m <= 3; m++) {
+      const mx = gx + (glassW * m) / 4;
+      this.ctx.moveTo(mx, gy);
+      this.ctx.lineTo(mx, gy + glassH);
+    }
+    this.ctx.stroke();
+
+    // 幕墙斜向双层流光反光
+    this.ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    this.ctx.beginPath();
+    this.ctx.moveTo(gx + 2, gy);
+    this.ctx.lineTo(gx + glassW * 0.32, gy);
+    this.ctx.lineTo(gx + glassW * 0.14, gy + glassH);
+    this.ctx.lineTo(gx + 2, gy + glassH);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    // 3. 顶部专属黑金楼层铭牌徽标 ("10F SKY LOUNGE" / "20F SKY LOUNGE")
+    const plaqueW = Math.min(w - 14, 58);
+    const plaqueH = 7;
+    const px = x - plaqueW / 2;
+    const py = y + 3.5;
+    this.ctx.fillStyle = '#0f172a';
+    this.ctx.fillRect(px, py, plaqueW, plaqueH);
+    this.ctx.strokeStyle = '#ffd166';
+    this.ctx.lineWidth = 1.0;
+    this.ctx.strokeRect(px, py, plaqueW, plaqueH);
+
+    this.ctx.fillStyle = '#ffd166';
+    this.ctx.font = 'bold 5px monospace';
+    this.ctx.textAlign = 'center';
+    this.ctx.fillText(`★ ${floorNum}F SKY LOUNGE ★`, x, py + 5.2);
+
+    // 4. 底部出挑空中花园露台与迎宾松柏绿植盆栽 (Cantilevered Sky Garden Terrace & Cypress Planters)
+    const deckW = w + 6;
+    const deckX = x - deckW / 2;
+    const deckY = gy + glassH;
+    this.ctx.fillStyle = '#1e293b';
+    this.ctx.fillRect(deckX, deckY, deckW, 4);
+    this.ctx.fillStyle = '#ffd166';
+    this.ctx.fillRect(deckX, deckY, deckW, 1.2);
+
+    // 两侧对称空中花园松柏绿植球与金色花钵
+    const planterXs = [gx + 6, gx + glassW - 6, x - 9, x + 9];
+    for (let i = 0; i < planterXs.length; i++) {
+      const tx = planterXs[i];
+      const ty = deckY;
+      // 金色花钵
+      this.ctx.fillStyle = '#d97706';
+      this.ctx.fillRect(tx - 2.2, ty - 3, 4.4, 3);
+      // 翠绿修剪松柏球冠
+      this.ctx.fillStyle = (i % 2 === 0) ? '#10b981' : '#22c55e';
+      this.ctx.beginPath();
+      this.ctx.arc(tx, ty - 5.2, 3.0, 0, TWO_PI);
+      this.ctx.fill();
+      this.ctx.fillStyle = '#86efac';
+      this.ctx.beginPath();
+      this.ctx.arc(tx - 0.8, ty - 6.0, 1.1, 0, TWO_PI);
+      this.ctx.fill();
+    }
+
+    // 露台玻璃护栏微光
+    this.ctx.strokeStyle = 'rgba(254, 240, 138, 0.75)';
+    this.ctx.lineWidth = 1.0;
+    this.ctx.strokeRect(gx - 1, deckY - 4.5, glassW + 2, 4.5);
   }
 
   // 1F 豪华挑高迎宾大堂入口门斗 (Grand Ground Entrance Lobby)
@@ -4621,10 +4891,86 @@ class TowerBloxxGame {
 
     this.ctx.restore();
 
-    // 3. 绘制悬挂中的 2.5D 小房子 (下移至 swingY + 58，提供逼真的 40px 加长吊绳空间)
+    // 3. 绘制悬挂中的 2.5D 小房子与「完美对齐激光准星 / 黄金校准微光」
     if (!this.fallingBlock && this.state === 'PLAYING') {
       const block = this.swingingBlock;
       const houseY = swingY + 58;
+
+      // 3.1 激光垂线准星与 SWEET-SPOT 黄金校准微光 (Laser Plumb-line & Sweet-Spot Glow)
+      if (!isRetro) {
+        const groundY = this.baseHeight - 120;
+        let targetX = this.baseWidth / 2;
+        let targetScreenY = groundY + this.camera.y;
+
+        if (this.tower.length > 0) {
+          const topBlock = this.tower[this.tower.length - 1];
+          targetX = topBlock.x + this.towerSway.offset;
+          targetScreenY = groundY - this.tower.length * topBlock.h + this.camera.y;
+        }
+
+        const alignDx = Math.abs(swingX - targetX);
+        const isSweetSpot = alignDx < 6;      // PERFECT 完美对齐阈值 (< 6px)
+        const isNearSpot = alignDx < 18;      // 接近对齐微光区
+
+        if (targetScreenY > houseY + block.h + 8) {
+          this.ctx.save();
+          const lineTopY = houseY + block.h + 2;
+          const lineBotY = Math.min(this.baseHeight, targetScreenY);
+
+          // 垂直激光校准虚线 (从底层楼顶中心向上延伸指引)
+          const laserGrad = this.ctx.createLinearGradient(0, lineTopY, 0, lineBotY);
+          if (isSweetSpot) {
+            laserGrad.addColorStop(0, 'rgba(255, 209, 102, 0.85)');
+            laserGrad.addColorStop(0.5, 'rgba(0, 240, 255, 0.75)');
+            laserGrad.addColorStop(1, 'rgba(255, 209, 102, 0.95)');
+          } else if (isNearSpot) {
+            laserGrad.addColorStop(0, 'rgba(0, 240, 255, 0.08)');
+            laserGrad.addColorStop(0.5, 'rgba(0, 240, 255, 0.28)');
+            laserGrad.addColorStop(1, 'rgba(0, 240, 255, 0.45)');
+          } else {
+            laserGrad.addColorStop(0, 'rgba(148, 163, 184, 0.0)');
+            laserGrad.addColorStop(0.6, 'rgba(148, 163, 184, 0.14)');
+            laserGrad.addColorStop(1, 'rgba(148, 163, 184, 0.25)');
+          }
+
+          this.ctx.strokeStyle = laserGrad;
+          this.ctx.lineWidth = isSweetSpot ? 2.0 : 1.1;
+          this.ctx.setLineDash(isSweetSpot ? [6, 3] : [4, 5]);
+          this.ctx.beginPath();
+          this.ctx.moveTo(targetX, lineTopY);
+          this.ctx.lineTo(targetX, lineBotY);
+          this.ctx.stroke();
+          this.ctx.setLineDash([]);
+
+          // 目标屋顶中心准星光环与 PERFECT 黄金锁定提示
+          if (isSweetSpot) {
+            this.ctx.shadowBlur = 10;
+            this.ctx.shadowColor = '#ffd166';
+            this.ctx.strokeStyle = '#ffd166';
+            this.ctx.lineWidth = 1.6;
+            this.ctx.beginPath();
+            this.ctx.ellipse(targetX, targetScreenY, 14, 4.5, 0, 0, TWO_PI);
+            this.ctx.stroke();
+
+            // 悬挂方块底边也亮起一道黄金对齐微光刃
+            this.ctx.strokeStyle = '#ffd166';
+            this.ctx.lineWidth = 2.2;
+            this.ctx.beginPath();
+            this.ctx.moveTo(swingX - block.w / 2, houseY + block.h);
+            this.ctx.lineTo(swingX + block.w / 2, houseY + block.h);
+            this.ctx.stroke();
+          } else if (isNearSpot) {
+            this.ctx.strokeStyle = 'rgba(0, 240, 255, 0.55)';
+            this.ctx.lineWidth = 1.2;
+            this.ctx.beginPath();
+            this.ctx.ellipse(targetX, targetScreenY, 9, 3, 0, 0, TWO_PI);
+            this.ctx.stroke();
+          }
+
+          this.ctx.restore();
+        }
+      }
+
       this.drawScandinavianBlock(swingX, houseY, block.w, block.h, isRetro, 999, this.crane.angle);
 
       // 4. 【精准 4 角工业吊索 + 动态物理弯曲张力动画】
@@ -4928,6 +5274,29 @@ window.closeSettingsDirectly = function(e) {
     startMenu.style.opacity = '1';
   }
   if (window.gameInstance) window.gameInstance.closeSettings();
+};
+
+window.pauseGameDirectly = function(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  if (!window.gameInstance) return;
+  if (window.gameInstance.state === 'PLAYING') {
+    window.gameInstance.pauseGame();
+  } else if (window.gameInstance.state === 'PAUSED') {
+    window.gameInstance.resumeGame();
+  }
+};
+
+window.resumeGameDirectly = function(e) {
+  if (e) {
+    e.preventDefault();
+    e.stopPropagation();
+  }
+  const pauseMenu = document.getElementById('pause-menu');
+  if (pauseMenu) pauseMenu.style.display = 'none';
+  if (window.gameInstance) window.gameInstance.resumeGame();
 };
 
 window.goHomeDirectly = function(e) {
